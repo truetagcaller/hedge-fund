@@ -67,6 +67,184 @@ def _empty_snapshot() -> Dict[str, Any]:
     }
 
 
+async def _get_active_broker_type(request: Request, user_id: str) -> str:
+    """Return the active broker type for this user, or empty string."""
+    from hedgefund.execution.capabilities import BROKER_CAPABILITIES
+
+    def _type_from_id(broker_id: str) -> str:
+        for known in BROKER_CAPABILITIES:
+            if broker_id == known or broker_id.startswith(known + "_"):
+                return known
+        return ""
+
+    # 1. Check in-memory BrokerRouter (always up to date after switch)
+    br = getattr(request.app.state, "broker_router", None)
+    if br:
+        try:
+            bid = await br.get_active_broker(user_id)
+            if bid:
+                bt = _type_from_id(bid)
+                if bt:
+                    return bt
+        except Exception:
+            pass
+
+    # 2. Fall back to MongoDB
+    db = _get_db(request)
+    if db is not None:
+        try:
+            pref = await db.user_preferences.find_one({"user_id": user_id})
+            if pref:
+                broker_id = pref.get("active_broker", "")
+                bt = _type_from_id(broker_id)
+                if bt:
+                    return bt
+        except Exception:
+            pass
+    return ""
+
+
+async def _fetch_groww_portfolio() -> Dict[str, Any] | None:
+    """Fetch portfolio directly from Groww Trading API."""
+    try:
+        from hedgefund.security.credential_store import CredentialStore
+        store = CredentialStore()
+        api_key = store.retrieve("groww", "api_key")
+        api_secret = store.retrieve("groww", "api_secret")
+        if not api_key:
+            return None
+
+        import httpx
+        token = api_key if api_key.startswith("Bearer ") else f"Bearer {api_key}"
+        headers = {
+            "Authorization": token,
+            "X-API-VERSION": "1.0",
+            "Accept": "application/json",
+        }
+        base = "https://api.groww.in/v1"
+
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            # Fetch user profile
+            profile_resp = await client.get(f"{base}/user/profile", headers=headers)
+            if profile_resp.status_code != 200:
+                log.warning(
+                    "portfolio.groww_profile_failed",
+                    status=profile_resp.status_code,
+                )
+                return None
+
+            profile_data = profile_resp.json()
+            success = profile_data.get("success", profile_data)
+            user_info = (
+                success.get("data", success)
+                if isinstance(success, dict) else {}
+            )
+
+            # Fetch holdings
+            positions: list[Dict[str, Any]] = []
+            holdings_value = 0.0
+            holdings_pnl = 0.0
+
+            hold_resp = await client.get(f"{base}/holdings/user", headers=headers)
+            if hold_resp.status_code == 200:
+                hold_data = hold_resp.json()
+                holdings_list = _extract_groww_list(hold_data, "holdings")
+                for h in holdings_list:
+                    symbol = h.get("trading_symbol", h.get("tradingSymbol", ""))
+                    qty = int(h.get("quantity", 0))
+                    if qty == 0:
+                        continue
+                    avg_price = float(h.get("average_price", h.get("avgPrice", 0)))
+                    last_price = float(h.get("ltp", h.get("lastPrice", avg_price)))
+                    pnl = (last_price - avg_price) * qty
+                    holdings_value += last_price * qty
+                    holdings_pnl += pnl
+                    positions.append({
+                        "symbol": symbol,
+                        "exchange": h.get("exchange", "NSE"),
+                        "quantity": qty,
+                        "avg_price": avg_price,
+                        "last_price": last_price,
+                        "pnl": round(pnl, 2),
+                        "product": "CNC",
+                        "source": "groww",
+                        "is_holding": True,
+                    })
+
+            # Fetch intraday positions
+            pos_resp = await client.get(f"{base}/positions/user", headers=headers)
+            pos_value = 0.0
+            pos_pnl = 0.0
+            if pos_resp.status_code == 200:
+                pos_data = pos_resp.json()
+                pos_list = _extract_groww_list(pos_data, "positions")
+                for p in pos_list:
+                    symbol = p.get("trading_symbol", p.get("tradingSymbol", ""))
+                    qty = int(p.get("quantity", 0))
+                    if qty == 0:
+                        continue
+                    net_price = float(p.get("net_price", p.get("netPrice", 0)))
+                    realised = float(p.get("realised_pnl", p.get("realisedPnl", 0)))
+                    pos_value += abs(qty) * net_price
+                    pos_pnl += realised
+                    positions.append({
+                        "symbol": symbol,
+                        "exchange": p.get("exchange", "NSE"),
+                        "quantity": qty,
+                        "avg_price": net_price,
+                        "last_price": net_price,
+                        "pnl": round(realised, 2),
+                        "product": p.get("product", "MIS"),
+                        "source": "groww",
+                    })
+
+            total_value = holdings_value + pos_value
+            total_pnl = holdings_pnl + pos_pnl
+
+            return {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "cash": 0.0,
+                "net_liquidation": total_value,
+                "total_market_value": total_value,
+                "position_count": len(positions),
+                "positions": positions,
+                "total_delta": 0.0,
+                "total_gamma": 0.0,
+                "total_theta": 0.0,
+                "total_vega": 0.0,
+                "daily_pnl": total_pnl,
+                "total_pnl": total_pnl,
+                "drawdown_pct": 0.0,
+                "high_water_mark": total_value,
+                "broker": "groww",
+                "source": "Groww Trading API",
+                "ucc": user_info.get("ucc", ""),
+                "segments": user_info.get("activeSegments", []),
+            }
+    except Exception as exc:
+        log.warning("portfolio.groww_fetch_failed", error=str(exc))
+        return None
+
+
+def _extract_groww_list(result: Any, key: str) -> list[Dict[str, Any]]:
+    """Extract a list from Groww API response shapes."""
+    if isinstance(result, list):
+        return result
+    if not isinstance(result, dict):
+        return []
+    success = result.get("success", result)
+    if isinstance(success, dict):
+        data = success.get("data", success)
+        if isinstance(data, dict):
+            items = data.get(key, [])
+            if isinstance(items, list):
+                return items
+        if isinstance(data, list):
+            return data
+    items = result.get(key, [])
+    return items if isinstance(items, list) else []
+
+
 async def _fetch_zerodha_portfolio() -> Dict[str, Any] | None:
     """Fetch portfolio directly from Zerodha Kite API."""
     try:
@@ -201,10 +379,27 @@ async def get_portfolio(
     user_id = user["user_id"]
     db = _get_db(request)
 
-    # 1. Try Zerodha API directly (most accurate for real funds)
-    zerodha_data = await _fetch_zerodha_portfolio()
-    if zerodha_data is not None:
-        return zerodha_data
+    # 1. Fetch from the user's active broker
+    active_broker = await _get_active_broker_type(request, user_id)
+
+    _broker_fetchers: Dict[str, Any] = {
+        "zerodha": _fetch_zerodha_portfolio,
+        "groww": _fetch_groww_portfolio,
+    }
+
+    # Try active broker first
+    if active_broker in _broker_fetchers:
+        data = await _broker_fetchers[active_broker]()
+        if data is not None:
+            return data
+
+    # Fall back to other brokers
+    for broker_type, fetcher in _broker_fetchers.items():
+        if broker_type == active_broker:
+            continue
+        data = await fetcher()
+        if data is not None:
+            return data
 
     # 2. Try MongoDB positions
     if db is not None:

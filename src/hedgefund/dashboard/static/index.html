@@ -494,6 +494,7 @@
       <div class="metric-card"><div class="metric-label">Win Rate</div><div class="metric-value neutral" id="ov-win-rate">--</div></div>
       <div class="metric-card"><div class="metric-label">Sharpe Ratio</div><div class="metric-value neutral" id="ov-sharpe">--</div></div>
       <div class="metric-card"><div class="metric-label">Drawdown</div><div class="metric-value" id="ov-drawdown">--</div></div>
+      <div class="metric-card"><div class="metric-label">Data Source</div><div class="metric-value neutral" id="ov-data-source" style="font-size:0.85em">--</div></div>
     </div>
     <div class="grid-3" style="margin-bottom:16px;">
       <div class="panel" style="grid-column:1/3;">
@@ -1047,6 +1048,8 @@
     setText("ov-daily-pnl", fmtCurrency(d.daily_pnl), pnlClass(d.daily_pnl));
     setText("ov-total-pnl", fmtCurrency(d.total_pnl), pnlClass(d.total_pnl));
     setText("ov-drawdown", fmtPct(d.drawdown_pct), d.drawdown_pct > 0.05 ? "negative" : "neutral");
+    var srcEl = document.getElementById("ov-data-source");
+    if (srcEl) srcEl.textContent = d.source || d.broker || "";
     if (d.net_liquidation) {
       portfolioHistory.push(d.net_liquidation);
       if (portfolioHistory.length > 200) portfolioHistory.shift();
@@ -1055,15 +1058,38 @@
     renderOverviewPositions(d.positions || []);
     renderPortfolioPositions(d.positions || []);
   }
+  // Normalize position shape from both broker-direct (flat) and dataclass (nested) formats
+  function normPos(p) {
+    var c = p.contract || {};
+    return {
+      symbol: p.symbol || c.symbol || c.underlying || "--",
+      underlying: p.underlying || c.underlying || "--",
+      option_type: p.product || c.option_type || "Stock",
+      strike: c.strike || 0,
+      expiration: c.expiration || "--",
+      exchange: p.exchange || "--",
+      quantity: p.quantity || 0,
+      avg_entry: p.avg_entry || p.avg_price || 0,
+      current_price: p.current_price || p.last_price || 0,
+      unrealized_pnl: p.unrealized_pnl != null ? p.unrealized_pnl : (p.pnl || 0),
+      realized_pnl: p.realized_pnl || 0,
+      market_value: p.market_value || ((p.current_price || p.last_price || 0) * Math.abs(p.quantity || 0)),
+      delta: p.delta || (p.greeks && p.greeks.delta) || 0,
+      gamma: p.gamma || (p.greeks && p.greeks.gamma) || 0,
+      theta: p.theta || (p.greeks && p.greeks.theta) || 0,
+      vega: p.vega || (p.greeks && p.greeks.vega) || 0,
+      source: p.source || ""
+    };
+  }
   function renderOverviewPositions(positions) {
     var body = document.getElementById("ov-positions-body");
     if (!positions.length) { body.innerHTML = '<tr><td colspan="11" class="empty-state">No open positions</td></tr>'; return; }
     var html = "";
     for (var i = 0; i < positions.length; i++) {
-      var p = positions[i], c = p.contract || {};
+      var p = normPos(positions[i]);
       var pnlPct = p.avg_entry ? ((p.current_price - p.avg_entry) / p.avg_entry) * (p.quantity > 0 ? 1 : -1) : 0;
-      html += "<tr><td>" + esc(c.symbol || c.underlying || "--") + "</td><td>" + esc(c.option_type || "Stock") +
-        "</td><td>" + (p.quantity || 0) + "</td><td>" + fmtCurrency(p.avg_entry) +
+      html += "<tr><td>" + esc(p.symbol) + "</td><td>" + esc(p.option_type) +
+        "</td><td>" + p.quantity + "</td><td>" + fmtCurrency(p.avg_entry) +
         "</td><td>" + fmtCurrency(p.current_price) + '</td><td class="' + pnlClass(p.unrealized_pnl) + '">' +
         fmtCurrency(p.unrealized_pnl) + '</td><td class="' + pnlClass(pnlPct) + '">' + fmtPct(pnlPct) +
         "</td><td>" + fmtNum(p.delta, 2) + "</td><td>" + fmtNum(p.gamma, 3) +
@@ -1076,10 +1102,10 @@
     if (!positions.length) { body.innerHTML = '<tr><td colspan="15" class="empty-state">No positions</td></tr>'; return; }
     var html = "";
     for (var i = 0; i < positions.length; i++) {
-      var p = positions[i], c = p.contract || {};
-      html += "<tr><td>" + esc(c.symbol || "--") + "</td><td>" + esc(c.underlying || "--") +
-        "</td><td>" + esc(c.option_type || "--") + "</td><td>" + fmtNum(c.strike, 2) +
-        "</td><td>" + esc(c.expiration || "--") + "</td><td>" + (p.quantity || 0) +
+      var p = normPos(positions[i]);
+      html += "<tr><td>" + esc(p.symbol) + "</td><td>" + esc(p.underlying) +
+        "</td><td>" + esc(p.option_type) + "</td><td>" + fmtNum(p.strike, 2) +
+        "</td><td>" + esc(p.expiration) + "</td><td>" + p.quantity +
         "</td><td>" + fmtCurrency(p.avg_entry) + "</td><td>" + fmtCurrency(p.current_price) +
         '</td><td class="' + pnlClass(p.unrealized_pnl) + '">' + fmtCurrency(p.unrealized_pnl) +
         '</td><td class="' + pnlClass(p.realized_pnl) + '">' + fmtCurrency(p.realized_pnl) +
@@ -1393,7 +1419,7 @@
     var html = "";
     for (var i = 0; i < connectedBrokers.length; i++) {
       var b = connectedBrokers[i];
-      var sd = (b.status === "connected" || b.connected) ? "status-connected" : "status-disconnected";
+      var sd = (b.status === "connected" || b.status === "configured" || b.connected) ? "status-connected" : "status-disconnected";
       html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">' +
         '<div class="broker-status-dot ' + sd + '"></div><div><div style="font-weight:600;">' +
         esc(b.name || b.broker_type || b.type || "Unknown") + '</div><div style="font-size:11px;color:var(--text-secondary);">' +
@@ -1416,7 +1442,7 @@
     for (var i = 0; i < connectedBrokers.length; i++) {
       var b = connectedBrokers[i];
       var sc = "status-disconnected";
-      if (b.status === "connected" || b.connected) sc = "status-connected";
+      if (b.status === "connected" || b.status === "configured" || b.connected) sc = "status-connected";
       else if (b.status === "connecting") sc = "status-connecting";
       var bid = esc(b.id || b.broker_id || i);
       var capHtml = "";
@@ -1508,8 +1534,9 @@
           '<div class="form-checkbox"><input type="checkbox" id="b-futures"><label for="b-futures">Futures</label></div>';
         break;
       case "groww":
-        html = '<div class="form-group"><label>Email/Phone</label><input type="text" id="g-email" placeholder="Email or phone"></div>' +
-          '<div class="form-group"><label>Session Token</label><input type="password" id="g-session" placeholder="Session token"></div>';
+        html = '<div class="form-group"><label>API Key</label><input type="text" id="g-api-key" placeholder="Groww API key (JWT)"></div>' +
+          '<div class="form-group"><label>API Secret</label><input type="password" id="g-api-secret" placeholder="API secret"></div>' +
+          '<div class="form-note">API keys reset daily at 6 AM. Get yours from the Groww developer portal.</div>';
         break;
       case "indmoney":
         html = '<div class="form-group"><label>Session Token</label><input type="password" id="im-session" placeholder="Session token"></div>';
@@ -1555,8 +1582,8 @@
         cred.futures = (document.getElementById("b-futures") || {}).checked || false;
         break;
       case "groww":
-        cred.email = (document.getElementById("g-email") || {}).value || "";
-        cred.session_token = (document.getElementById("g-session") || {}).value || "";
+        cred.api_key = (document.getElementById("g-api-key") || {}).value || "";
+        cred.api_secret = (document.getElementById("g-api-secret") || {}).value || "";
         break;
       case "indmoney":
         cred.session_token = (document.getElementById("im-session") || {}).value || "";
@@ -1926,7 +1953,7 @@
 
   // ── Broker Switcher ──────────────────────────────────────────
   function fetchConnectedBrokers() {
-    fetch("/api/broker/connected").then(function(r) { return r.json(); }).then(function(data) {
+    authFetch("/api/broker/connected").then(function(r) { return r.json(); }).then(function(data) {
       var sel = document.getElementById("broker-select");
       var brokers = data.brokers || [];
       var activeId = data.active_broker || "";
@@ -1938,7 +1965,7 @@
           var b = brokers[i];
           var opt = document.createElement("option");
           opt.value = b.broker_id;
-          opt.textContent = b.display_name + (b.status === "connected" ? " \u2713" : " \u2717");
+          opt.textContent = b.display_name + ((b.status === "connected" || b.status === "configured") ? " \u2713" : " \u2717");
           if (b.broker_id === activeId) opt.selected = true;
           sel.appendChild(opt);
         }

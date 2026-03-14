@@ -472,9 +472,8 @@ class BrokerManager:
             from hedgefund.execution.groww import GrowwBroker, GrowwConfig
 
             config = GrowwConfig(
-                email=credentials.get("email", ""),
-                token=credentials.get("token", credentials.get("api_key", "")),
-                session_id=credentials.get("session_id", ""),
+                api_key=credentials.get("api_key", ""),
+                api_secret=credentials.get("api_secret", ""),
             )
             return GrowwBroker(config)
 

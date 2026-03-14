@@ -83,12 +83,14 @@ BROKER_CAPABILITIES: dict[str, BrokerCapabilities] = {
     "groww": BrokerCapabilities(
         broker_type="groww",
         display_name="Groww",
+        options_trading=True,
+        futures_trading=True,
         equity_trading=True,
         mutual_funds=True,
-        market_data=False,
-        order_placement=False,  # read-only
-        supported_exchanges=["NSE", "BSE"],
-        supported_order_types=[],
+        market_data=True,
+        order_placement=True,
+        supported_exchanges=["NSE", "BSE", "NFO", "COMMODITY"],
+        supported_order_types=["MARKET", "LIMIT"],
     ),
     "indmoney": BrokerCapabilities(
         broker_type="indmoney",

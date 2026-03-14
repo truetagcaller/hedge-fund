@@ -28,6 +28,22 @@ class SwitchBrokerRequest(BaseModel):
     broker_id: str = Field(..., description="Broker ID to switch to")
 
 
+def _broker_type_from_id(broker_id: str) -> str:
+    """Extract the broker type from a broker_id.
+
+    Handles formats like ``zerodha_main``, ``groww_1710432000000``, etc.
+    """
+    for known in BROKER_CAPABILITIES:
+        if broker_id == known or broker_id.startswith(known + "_"):
+            return known
+    # Last-resort: strip common suffixes
+    return (
+        broker_id.replace("_main", "")
+        .replace("_default", "")
+        .split("_")[0]
+    )
+
+
 def _caps_to_dict(caps: Any) -> Dict[str, Any]:
     if caps is None:
         return {}
@@ -67,20 +83,22 @@ async def get_active_broker(
 
     active_id = ""
 
-    # Check MongoDB preference
-    if db is not None:
+    # Check BrokerRouter in-memory (always up-to-date after switch)
+    br = getattr(request.app.state, "broker_router", None)
+    if br:
+        try:
+            active_id = await br.get_active_broker(user_id) or ""
+        except Exception:
+            pass
+
+    # Fall back to MongoDB preference
+    if not active_id and db is not None:
         try:
             pref = await db.user_preferences.find_one({"user_id": user_id})
             if pref:
                 active_id = pref.get("active_broker", "")
         except Exception:
             pass
-
-    # Check BrokerRouter in-memory
-    if not active_id:
-        br = getattr(request.app.state, "broker_router", None)
-        if br:
-            active_id = await br.get_active_broker(user_id) or ""
 
     # Fall back to first connected broker
     if not active_id and db is not None:
@@ -93,11 +111,11 @@ async def get_active_broker(
         except Exception:
             pass
 
-    broker_type = (
-        active_id.replace("_main", "").replace("_default", "")
-        if active_id else ""
-    )
-    caps = get_capabilities(broker_type) if broker_type else None
+    broker_type = _broker_type_from_id(active_id) if active_id else ""
+    try:
+        caps = get_capabilities(broker_type) if broker_type else None
+    except KeyError:
+        caps = None
 
     return {
         "active_broker": active_id,
@@ -147,10 +165,11 @@ async def switch_broker(
             # In-memory update is best-effort; DB preference already saved
             log.debug("broker_switch.router_update_failed", exc_info=True)
 
-    broker_type = (
-        broker_id.replace("_main", "").replace("_default", "")
-    )
-    caps = get_capabilities(broker_type)
+    broker_type = _broker_type_from_id(broker_id)
+    try:
+        caps = get_capabilities(broker_type)
+    except KeyError:
+        caps = None
 
     log.info(
         "broker_switch.switched",
@@ -212,9 +231,15 @@ async def get_connected_brokers(
     brokers: List[Dict[str, Any]] = []
     seen_types: set[str] = set()
 
-    # Get active broker
+    # Get active broker — check in-memory router first, then MongoDB
     active_id = ""
-    if db is not None:
+    br = getattr(request.app.state, "broker_router", None)
+    if br:
+        try:
+            active_id = await br.get_active_broker(user_id) or ""
+        except Exception:
+            pass
+    if not active_id and db is not None:
         try:
             pref = await db.user_preferences.find_one({"user_id": user_id})
             if pref:
@@ -228,7 +253,10 @@ async def get_connected_brokers(
             async for doc in db.broker_connections.find({"is_active": True}):
                 bt = doc.get("broker", "")
                 bid = f"{bt}_main"
-                caps = get_capabilities(bt)
+                try:
+                    caps = get_capabilities(bt)
+                except KeyError:
+                    caps = None
                 seen_types.add(bt)
                 brokers.append({
                     "broker_id": bid,
@@ -248,6 +276,39 @@ async def get_connected_brokers(
                 })
         except Exception:
             log.debug("broker_connected.db_error", exc_info=True)
+
+    # Also check broker_accounts (used by /api/brokers/connect)
+    if db is not None:
+        try:
+            query = {"user_id": user_id, "status": {"$ne": "disconnected"}}
+            async for doc in db.broker_accounts.find(query):
+                bid = doc.get("broker_id", "")
+                bt = doc.get("broker_type", "")
+                if bid in {b["broker_id"] for b in brokers}:
+                    continue  # already listed
+                try:
+                    caps = get_capabilities(bt)
+                except KeyError:
+                    caps = None
+                seen_types.add(bt)
+                brokers.append({
+                    "broker_id": bid,
+                    "broker_type": bt,
+                    "display_name": (
+                        getattr(caps, "display_name", bt) if caps else bt
+                    ),
+                    "status": doc.get("status", "connected"),
+                    "user_name": "",
+                    "connected_at": (
+                        doc["connected_at"].isoformat()
+                        if hasattr(doc.get("connected_at"), "isoformat")
+                        else str(doc.get("connected_at", ""))
+                    ),
+                    "capabilities": _caps_to_dict(caps),
+                    "is_active": bid == active_id,
+                })
+        except Exception:
+            log.debug("broker_connected.accounts_error", exc_info=True)
 
     # Check credential store
     try:

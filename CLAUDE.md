@@ -104,7 +104,7 @@ All brokers implement `execution/base.py::Broker` ABC:
 |---------|--------|--------|---------|-------------|
 | **ZerodhaBroker** | `execution/zerodha.py` | Full | Yes (Kite Connect v3) | Yes |
 | **BinanceBroker** | `execution/binance.py` | Full | Yes (Spot/Futures/Options) | Yes (WebSocket) |
-| **GrowwBroker** | `execution/groww.py` | Read-only | No | No |
+| **GrowwBroker** | `execution/groww.py` | Full | Yes (Groww Trading API) | Yes (LTP/Quote/OHLC) |
 | **IndMoneyBroker** | `execution/indmoney.py` | Read-only | No | No |
 | **PaperBroker** | `execution/paper.py` | Full | Yes (simulated) | No |
 
@@ -118,7 +118,7 @@ Each broker has a declared capability profile:
 |--------|---------|---------|--------|--------|----|-----------|--------|-------------|
 | **Zerodha** | Yes | Yes | - | Yes | - | - | Yes | Yes |
 | **Binance** | Yes | Yes | Yes | - | - | - | Yes | Yes |
-| **Groww** | - | - | - | Yes | Yes | - | Read-only | - |
+| **Groww** | Yes | Yes | - | Yes | Yes | - | Yes | Yes |
 | **INDMoney** | - | - | - | Yes | Yes | Yes | Read-only | - |
 | **Paper** | Yes | Yes | Yes | Yes | - | - | Yes | - |
 
@@ -127,11 +127,12 @@ Functions: `get_capabilities(broker_type)`, `can_trade(broker_type)`, `supports_
 #### Broker Router (`execution/broker_router.py`)
 
 Routes trade requests to the correct broker:
-- **Per-user active broker** — stored in MongoDB `user_preferences`, switchable via dashboard
+- **Per-user active broker** — in-memory via `BrokerRouter._user_active_broker` (primary), MongoDB `user_preferences` (fallback), switchable via dashboard
 - **Per-trade override** — `route_order(user_id, order, broker_id="binance_main")`
 - **Capability-based auto-routing** — crypto → Binance, Indian options (NFO) → Zerodha, US stocks → INDMoney
 - **Failover** — if active broker fails, tries backup brokers that support order placement
 - **Aggregation** — `get_portfolio()` can aggregate across all connected brokers
+- **Broker-aware data routing** — `/api/portfolio`, `/api/market-data/*` endpoints route to active broker's API
 
 #### Order Builder (`execution/order_builder.py`)
 
@@ -192,6 +193,18 @@ Signals require: 2+ agents agreeing, 50%+ confidence, 1.5+ risk-reward ratio.
 - **Postback URL**: `https://hedgefund.viewfir.com/api/broker/zerodha/postback`
 - **Whitelist IP**: `65.0.102.15`
 
+#### Groww Trading API
+- **Base URL**: `https://api.groww.in/v1`
+- **Auth**: `Authorization: Bearer <JWT>` + `X-API-VERSION: 1.0` headers
+- **User profile**: `GET /user/profile` — returns UCC, active segments (CASH/FNO/COMMODITY), NSE/BSE status
+- **Holdings**: `GET /holdings/user` — stock holdings with ISIN, quantity, average price
+- **Positions**: `GET /positions/user` — intraday/derivative positions (filterable by segment)
+- **Orders**: `POST /order/create`, `POST /order/cancel`, `GET /order/list`, `GET /order/status/{id}`
+- **Market data**: `GET /live-data/ltp`, `GET /live-data/quote`, `GET /live-data/ohlc`
+- **Option chain**: `GET /option-chain/exchange/{exchange}/underlying/{underlying}`
+- **Credentials**: `groww/` namespace — `api_key` (JWT, resets daily 6 AM IST), `api_secret`
+- **Dashboard login**: API Key + API Secret form (not email/phone)
+
 #### X (Twitter)
 - **OAuth 2.0 flow**: `GET /api/auth/twitter/login` → Twitter authorize → `GET /api/auth/twitter/callback`
 - **Webhook**: `GET /twitter` (CRC challenge) + `POST /twitter` (Account Activity events)
@@ -247,9 +260,10 @@ FastAPI app factory in `dashboard/server.py`. REST routes under `/api/*`, WebSoc
 | `POST /twitter` | `routes/twitter_webhook.py` | Twitter webhook events |
 
 **Dashboard UI Features:**
-- Broker switcher dropdown in header
+- Broker switcher dropdown in header (uses `authFetch` for authenticated API calls)
 - Capability badges (Options, Futures, Crypto, Equity) per broker
-- Active broker indicator
+- Active broker indicator with "Data Source" metric card showing current provider
+- Broker-aware portfolio/positions display (normalizes both flat and nested formats via `normPos()`)
 - 8 AI agent weight sliders (regime-adaptive)
 - Currency display in ₹ (Indian Rupee, `en-IN` formatting)
 
@@ -278,6 +292,7 @@ Chain-of-responsibility in `risk/validators.py`: CapitalAvailable → PositionLi
 
 Currently stored namespaces:
 - `zerodha/` — `api_key`, `api_secret`, `access_token`, `user_id`
+- `groww/` — `api_key` (JWT access token, resets daily 6 AM IST), `api_secret`
 - `twitter/` — `consumer_key`, `consumer_secret`, `client_id`, `client_secret`, `app_bearer_token`
 
 API: `store.store(namespace, key, value)`, `store.retrieve(namespace, key)`, `store.list_namespaces()`

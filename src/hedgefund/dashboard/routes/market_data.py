@@ -1,8 +1,9 @@
-"""FastAPI routes for live market data and historical charts via Zerodha Kite Connect.
+"""FastAPI routes for live market data and historical charts.
 
 Provides REST endpoints for live quotes, LTP, historical OHLCV candles,
-instrument listing, and instrument search.  All data is sourced from the
-Zerodha Kite Connect API with no synthetic/mock fallback.
+instrument listing, and instrument search.  Data is sourced from the active
+broker's market data API (Zerodha Kite Connect, Groww Trading API, etc.)
+with no synthetic/mock fallback.
 """
 
 from __future__ import annotations
@@ -10,13 +11,53 @@ from __future__ import annotations
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+
+from hedgefund.auth.middleware import get_current_user_optional
 
 log = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/api/market-data", tags=["market-data"])
 
 _SOURCE = "Zerodha Kite API"
+_GROWW_SOURCE = "Groww Trading API"
+
+
+async def _get_active_broker_type(request: Request) -> str:
+    """Return the active broker type, checking in-memory router first."""
+    from hedgefund.execution.capabilities import BROKER_CAPABILITIES
+
+    def _type_from_id(broker_id: str) -> str:
+        for known in BROKER_CAPABILITIES:
+            if broker_id == known or broker_id.startswith(known + "_"):
+                return known
+        return ""
+
+    # 1. In-memory BrokerRouter (always current after switch)
+    br = getattr(request.app.state, "broker_router", None)
+    if br:
+        try:
+            # Check all users (dashboard may not have user context here)
+            for uid, bid in getattr(br, "_user_active_broker", {}).items():
+                bt = _type_from_id(bid)
+                if bt:
+                    return bt
+        except Exception:
+            pass
+
+    # 2. Fall back to MongoDB
+    db = getattr(request.app.state, "db", None)
+    if db is not None:
+        try:
+            pref = await db.user_preferences.find_one({})
+            if pref:
+                broker_id = pref.get("active_broker", "")
+                bt = _type_from_id(broker_id)
+                if bt:
+                    return bt
+        except Exception:
+            pass
+    return ""
 
 
 def _get_feed(request: Request) -> Any:
@@ -25,9 +66,86 @@ def _get_feed(request: Request) -> Any:
     if feed is None:
         raise HTTPException(
             status_code=503,
-            detail="Zerodha market feed is not available. Check Zerodha credentials.",
+            detail="Market feed is not available. Check broker credentials.",
         )
     return feed
+
+
+async def _groww_ltp(symbols: list[str]) -> dict[str, Any] | None:
+    """Fetch LTP from Groww Trading API for the given symbols."""
+    try:
+        from hedgefund.security.credential_store import CredentialStore
+        store = CredentialStore()
+        api_key = store.retrieve("groww", "api_key")
+        if not api_key:
+            return None
+
+        import httpx
+        token = api_key if api_key.startswith("Bearer ") else f"Bearer {api_key}"
+        headers = {
+            "Authorization": token,
+            "X-API-VERSION": "1.0",
+            "Accept": "application/json",
+        }
+        # Build exchange_symbols param: ["NSE:RELIANCE", ...] → "NSE:RELIANCE,NSE:INFY"
+        exchange_symbols = ",".join(symbols)
+        params = {"segment": "CASH", "exchange_symbols": exchange_symbols}
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                "https://api.groww.in/v1/live-data/ltp",
+                headers=headers,
+                params=params,
+            )
+            if resp.status_code != 200:
+                log.warning("groww_ltp_failed", status=resp.status_code)
+                return None
+            return resp.json()
+    except Exception as exc:
+        log.warning("groww_ltp_error", error=str(exc))
+        return None
+
+
+async def _groww_quote(symbol: str) -> dict[str, Any] | None:
+    """Fetch a full quote from Groww Trading API."""
+    try:
+        from hedgefund.security.credential_store import CredentialStore
+        store = CredentialStore()
+        api_key = store.retrieve("groww", "api_key")
+        if not api_key:
+            return None
+
+        import httpx
+        token = api_key if api_key.startswith("Bearer ") else f"Bearer {api_key}"
+        headers = {
+            "Authorization": token,
+            "X-API-VERSION": "1.0",
+            "Accept": "application/json",
+        }
+        # Parse exchange:symbol format
+        parts = symbol.split(":")
+        exchange = parts[0] if len(parts) > 1 else "NSE"
+        trading_symbol = parts[1] if len(parts) > 1 else parts[0]
+
+        params = {
+            "exchange": exchange,
+            "segment": "CASH",
+            "trading_symbol": trading_symbol,
+        }
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                "https://api.groww.in/v1/live-data/quote",
+                headers=headers,
+                params=params,
+            )
+            if resp.status_code != 200:
+                log.warning("groww_quote_failed", status=resp.status_code)
+                return None
+            return resp.json()
+    except Exception as exc:
+        log.warning("groww_quote_error", error=str(exc))
+        return None
 
 
 def _get_historical(request: Request) -> Any:
@@ -70,26 +188,41 @@ async def get_quote(symbol: str, request: Request) -> dict[str, Any]:
     Example: ``/api/market-data/quote/NSE:RELIANCE``
 
     Returns OHLC, depth, volume, OI, and last traded price.
+    Routes to the active broker's market data API.
     """
-    feed = _get_feed(request)
-    try:
-        data = await feed.get_quote([symbol])
-        if not data:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No quote data returned for {symbol}",
-            )
-        log.info(
-            "market_data.quote_served",
-            message="Market data received from Zerodha Kite API",
-            symbol=symbol,
-            source=_SOURCE,
-        )
-        return {"status": "ok", "data": data, "source": _SOURCE}
-    except PermissionError as exc:
-        raise HTTPException(status_code=401, detail=str(exc)) from exc
-    except RuntimeError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    active = await _get_active_broker_type(request)
+
+    # Try Groww if it's the active broker
+    if active == "groww":
+        data = await _groww_quote(symbol)
+        if data is not None:
+            return {"status": "ok", "data": data, "source": _GROWW_SOURCE}
+
+    # Try Zerodha feed
+    feed = getattr(request.app.state, "zerodha_feed", None)
+    if feed is not None:
+        try:
+            data = await feed.get_quote([symbol])
+            if data:
+                log.info(
+                    "market_data.quote_served",
+                    symbol=symbol,
+                    source=_SOURCE,
+                )
+                return {"status": "ok", "data": data, "source": _SOURCE}
+        except (PermissionError, RuntimeError):
+            pass
+
+    # Groww fallback if not already tried
+    if active != "groww":
+        data = await _groww_quote(symbol)
+        if data is not None:
+            return {"status": "ok", "data": data, "source": _GROWW_SOURCE}
+
+    raise HTTPException(
+        status_code=503,
+        detail="No market data feed available. Check broker credentials.",
+    )
 
 
 @router.get("/ltp")
@@ -100,25 +233,44 @@ async def get_ltp(
     """Get last traded price for comma-separated symbols.
 
     Example: ``/api/market-data/ltp?symbols=NSE:NIFTY+50,NSE:RELIANCE``
+    Routes to the active broker's market data API.
     """
-    feed = _get_feed(request)
     instrument_list = [s.strip() for s in symbols.split(",") if s.strip()]
     if not instrument_list:
         raise HTTPException(status_code=400, detail="No symbols provided")
 
-    try:
-        data = await feed.get_ltp(instrument_list)
-        log.info(
-            "market_data.ltp_served",
-            message="Market data received from Zerodha Kite API",
-            symbols=len(instrument_list),
-            source=_SOURCE,
-        )
-        return {"status": "ok", "data": data, "source": _SOURCE}
-    except PermissionError as exc:
-        raise HTTPException(status_code=401, detail=str(exc)) from exc
-    except RuntimeError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    active = await _get_active_broker_type(request)
+
+    # Try Groww if active
+    if active == "groww":
+        data = await _groww_ltp(instrument_list)
+        if data is not None:
+            return {"status": "ok", "data": data, "source": _GROWW_SOURCE}
+
+    # Try Zerodha feed
+    feed = getattr(request.app.state, "zerodha_feed", None)
+    if feed is not None:
+        try:
+            data = await feed.get_ltp(instrument_list)
+            log.info(
+                "market_data.ltp_served",
+                symbols=len(instrument_list),
+                source=_SOURCE,
+            )
+            return {"status": "ok", "data": data, "source": _SOURCE}
+        except (PermissionError, RuntimeError):
+            pass
+
+    # Groww fallback
+    if active != "groww":
+        data = await _groww_ltp(instrument_list)
+        if data is not None:
+            return {"status": "ok", "data": data, "source": _GROWW_SOURCE}
+
+    raise HTTPException(
+        status_code=503,
+        detail="No market data feed available. Check broker credentials.",
+    )
 
 
 # ── Historical candle endpoints ───────────────────────────────────────────────

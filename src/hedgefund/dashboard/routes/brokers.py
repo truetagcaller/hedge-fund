@@ -154,13 +154,19 @@ async def list_brokers(
     user_id = user["user_id"]
 
     brokers: List[Dict[str, Any]] = []
+    seen_types: set[str] = set()
+
     async for doc in db.broker_accounts.find(
         {"user_id": user_id},
         {"credentials_encrypted": 0},  # never return encrypted creds
     ):
+        bt = doc.get("broker_type", "")
+        seen_types.add(bt)
         brokers.append({
             "id": doc.get("broker_id", ""),
-            "type": doc.get("broker_type", ""),
+            "type": bt,
+            "name": doc.get("display_name", bt.title()),
+            "broker_type": bt,
             "status": doc.get("status", "unknown"),
             "connected_at": doc["connected_at"].isoformat()
             if isinstance(doc.get("connected_at"), datetime)
@@ -174,13 +180,43 @@ async def list_brokers(
     # Also include any in-memory brokers that belong to this user
     manager = _get_broker_manager(request)
     in_memory = await manager.get_all_brokers()
-    in_memory_ids = {b.get("id") for b in in_memory}
     db_ids = {b["id"] for b in brokers}
 
     # Add in-memory brokers not yet in DB
     for b in in_memory:
         if b.get("id") not in db_ids:
+            bt = b.get("type", "")
+            seen_types.add(bt)
             brokers.append(b)
+
+    # Also include brokers from credential store (e.g. manually configured)
+    try:
+        from hedgefund.security.credential_store import CredentialStore
+        from hedgefund.execution.capabilities import BROKER_CAPABILITIES, get_capabilities
+        store = CredentialStore()
+        for ns in store.list_namespaces():
+            if ns in ("twitter",) or ns in seen_types:
+                continue
+            if ns in BROKER_CAPABILITIES and store.retrieve(ns, "api_key"):
+                try:
+                    caps = get_capabilities(ns)
+                    display_name = getattr(caps, "display_name", ns.title())
+                except KeyError:
+                    display_name = ns.title()
+                brokers.append({
+                    "id": f"{ns}_main",
+                    "type": ns,
+                    "name": display_name,
+                    "broker_type": ns,
+                    "status": "configured",
+                    "connected_at": "",
+                    "last_refresh": None,
+                    "account_info": {},
+                    "capabilities": caps.to_dict() if caps else {},
+                })
+                seen_types.add(ns)
+    except Exception:
+        log.debug("brokers.credential_store_fallback_failed", exc_info=True)
 
     return {"brokers": brokers}
 
