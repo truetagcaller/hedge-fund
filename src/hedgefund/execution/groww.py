@@ -88,11 +88,12 @@ class GrowwBroker(Broker):
         self._client: Optional[httpx.AsyncClient] = None
         self._connected: bool = False
         self._user_info: dict[str, Any] = {}
+        self._access_token: str = ""
 
     # -- helpers -----------------------------------------------------------
 
     def _headers(self) -> dict[str, str]:
-        token = self._config.api_key
+        token = self._access_token or self._config.api_key
         auth_value = token if token.startswith("Bearer ") else f"Bearer {token}"
         return {
             "Authorization": auth_value,
@@ -150,12 +151,27 @@ class GrowwBroker(Broker):
     # -- lifecycle ---------------------------------------------------------
 
     async def connect(self) -> None:
-        """Validate the API key by fetching the user profile."""
+        """Exchange API key + secret for access token, then validate."""
         if not self._config.api_key:
             raise BrokerConnectionError(
                 "GrowwConfig.api_key is empty. Obtain an API key from the "
                 "Groww developer portal."
             )
+
+        # Exchange api_key + api_secret for an access token
+        try:
+            access_token = await asyncio.to_thread(
+                self._exchange_token,
+                self._config.api_key,
+                self._config.api_secret,
+            )
+            self._access_token = access_token
+            logger.info("groww_token_exchanged")
+        except Exception as exc:
+            raise BrokerConnectionError(
+                f"Groww token exchange failed: {exc}. "
+                "Check your API key and secret."
+            ) from exc
 
         self._client = httpx.AsyncClient(timeout=30.0)
 
@@ -177,6 +193,12 @@ class GrowwBroker(Broker):
         except Exception as exc:
             await self.disconnect()
             raise BrokerConnectionError(f"Groww connection failed: {exc}") from exc
+
+    @staticmethod
+    def _exchange_token(api_key: str, api_secret: str) -> str:
+        """Exchange API key + secret for an access token (blocking call)."""
+        from growwapi import GrowwAPI
+        return GrowwAPI.get_access_token(api_key=api_key, secret=api_secret)
 
     async def disconnect(self) -> None:
         """Close the HTTP client."""

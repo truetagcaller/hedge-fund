@@ -71,24 +71,47 @@ def _get_feed(request: Request) -> Any:
     return feed
 
 
+async def _get_groww_access_token() -> str | None:
+    """Exchange Groww API key + secret for an access token."""
+    try:
+        import asyncio
+        from hedgefund.security.credential_store import CredentialStore
+        from growwapi import GrowwAPI
+        store = CredentialStore()
+        api_key = store.retrieve("groww", "api_key")
+        api_secret = store.retrieve("groww", "api_secret")
+        if not api_key:
+            return None
+        return await asyncio.to_thread(
+            GrowwAPI.get_access_token, api_key=api_key, secret=api_secret,
+        )
+    except Exception as exc:
+        log.warning("groww_token_exchange_failed", error=str(exc))
+        return None
+
+
+def _to_groww_symbol(symbol: str) -> str:
+    """Convert 'NSE:RELIANCE' or 'RELIANCE' to Groww format 'NSE_RELIANCE'."""
+    if ":" in symbol:
+        return symbol.replace(":", "_")
+    return f"NSE_{symbol}"
+
+
 async def _groww_ltp(symbols: list[str]) -> dict[str, Any] | None:
     """Fetch LTP from Groww Trading API for the given symbols."""
     try:
-        from hedgefund.security.credential_store import CredentialStore
-        store = CredentialStore()
-        api_key = store.retrieve("groww", "api_key")
-        if not api_key:
+        access_token = await _get_groww_access_token()
+        if not access_token:
             return None
 
         import httpx
-        token = api_key if api_key.startswith("Bearer ") else f"Bearer {api_key}"
         headers = {
-            "Authorization": token,
+            "Authorization": f"Bearer {access_token}",
             "X-API-VERSION": "1.0",
             "Accept": "application/json",
         }
-        # Build exchange_symbols param: ["NSE:RELIANCE", ...] → "NSE:RELIANCE,NSE:INFY"
-        exchange_symbols = ",".join(symbols)
+        # Convert symbols to Groww format: NSE:RELIANCE → NSE_RELIANCE
+        exchange_symbols = ",".join(_to_groww_symbol(s) for s in symbols)
         params = {"segment": "CASH", "exchange_symbols": exchange_symbols}
 
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -109,16 +132,13 @@ async def _groww_ltp(symbols: list[str]) -> dict[str, Any] | None:
 async def _groww_quote(symbol: str) -> dict[str, Any] | None:
     """Fetch a full quote from Groww Trading API."""
     try:
-        from hedgefund.security.credential_store import CredentialStore
-        store = CredentialStore()
-        api_key = store.retrieve("groww", "api_key")
-        if not api_key:
+        access_token = await _get_groww_access_token()
+        if not access_token:
             return None
 
         import httpx
-        token = api_key if api_key.startswith("Bearer ") else f"Bearer {api_key}"
         headers = {
-            "Authorization": token,
+            "Authorization": f"Bearer {access_token}",
             "X-API-VERSION": "1.0",
             "Accept": "application/json",
         }

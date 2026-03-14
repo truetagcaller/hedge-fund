@@ -114,10 +114,21 @@ async def _fetch_groww_portfolio() -> Dict[str, Any] | None:
         if not api_key:
             return None
 
+        import asyncio
         import httpx
-        token = api_key if api_key.startswith("Bearer ") else f"Bearer {api_key}"
+
+        # Exchange api_key + secret for access token
+        try:
+            from growwapi import GrowwAPI
+            access_token = await asyncio.to_thread(
+                GrowwAPI.get_access_token, api_key=api_key, secret=api_secret,
+            )
+        except Exception as exc:
+            log.warning("portfolio.groww_token_exchange_failed", error=str(exc))
+            return None
+
         headers = {
-            "Authorization": token,
+            "Authorization": f"Bearer {access_token}",
             "X-API-VERSION": "1.0",
             "Accept": "application/json",
         }
@@ -139,6 +150,17 @@ async def _fetch_groww_portfolio() -> Dict[str, Any] | None:
                 success.get("data", success)
                 if isinstance(success, dict) else {}
             )
+
+            # Fetch margin/funds
+            cash = 0.0
+            margin_data: Dict[str, Any] = {}
+            margin_resp = await client.get(
+                f"{base}/margins/detail/user", headers=headers,
+            )
+            if margin_resp.status_code == 200:
+                m = margin_resp.json().get("payload", {})
+                cash = float(m.get("clear_cash", 0))
+                margin_data = m
 
             # Fetch holdings
             positions: list[Dict[str, Any]] = []
@@ -201,10 +223,11 @@ async def _fetch_groww_portfolio() -> Dict[str, Any] | None:
             total_value = holdings_value + pos_value
             total_pnl = holdings_pnl + pos_pnl
 
+            net_liq = cash + total_value
             return {
                 "timestamp": datetime.now(timezone.utc).isoformat(),
-                "cash": 0.0,
-                "net_liquidation": total_value,
+                "cash": cash,
+                "net_liquidation": net_liq,
                 "total_market_value": total_value,
                 "position_count": len(positions),
                 "positions": positions,
@@ -215,11 +238,12 @@ async def _fetch_groww_portfolio() -> Dict[str, Any] | None:
                 "daily_pnl": total_pnl,
                 "total_pnl": total_pnl,
                 "drawdown_pct": 0.0,
-                "high_water_mark": total_value,
+                "high_water_mark": net_liq,
                 "broker": "groww",
                 "source": "Groww Trading API",
                 "ucc": user_info.get("ucc", ""),
                 "segments": user_info.get("activeSegments", []),
+                "margin": margin_data,
             }
     except Exception as exc:
         log.warning("portfolio.groww_fetch_failed", error=str(exc))

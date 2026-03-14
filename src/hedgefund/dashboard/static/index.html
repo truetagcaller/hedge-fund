@@ -489,10 +489,10 @@
   <div class="content-area">
     <div class="metrics-row">
       <div class="metric-card"><div class="metric-label">Net Liquidation</div><div class="metric-value neutral" id="ov-net-liq">--</div></div>
+      <div class="metric-card"><div class="metric-label">Cash Available</div><div class="metric-value neutral" id="ov-cash">--</div></div>
       <div class="metric-card"><div class="metric-label">Daily P&amp;L</div><div class="metric-value" id="ov-daily-pnl">--</div></div>
       <div class="metric-card"><div class="metric-label">Total P&amp;L</div><div class="metric-value" id="ov-total-pnl">--</div></div>
-      <div class="metric-card"><div class="metric-label">Win Rate</div><div class="metric-value neutral" id="ov-win-rate">--</div></div>
-      <div class="metric-card"><div class="metric-label">Sharpe Ratio</div><div class="metric-value neutral" id="ov-sharpe">--</div></div>
+      <div class="metric-card"><div class="metric-label">Positions</div><div class="metric-value neutral" id="ov-pos-count">0</div></div>
       <div class="metric-card"><div class="metric-label">Drawdown</div><div class="metric-value" id="ov-drawdown">--</div></div>
       <div class="metric-card"><div class="metric-label">Data Source</div><div class="metric-value neutral" id="ov-data-source" style="font-size:0.85em">--</div></div>
     </div>
@@ -1045,8 +1045,10 @@
   // ── Portfolio ─────────────────────────────────────────────────
   function handlePortfolio(d) {
     setText("ov-net-liq", fmtCurrency(d.net_liquidation), "neutral");
+    setText("ov-cash", fmtCurrency(d.cash), "neutral");
     setText("ov-daily-pnl", fmtCurrency(d.daily_pnl), pnlClass(d.daily_pnl));
     setText("ov-total-pnl", fmtCurrency(d.total_pnl), pnlClass(d.total_pnl));
+    setText("ov-pos-count", String(d.position_count || (d.positions ? d.positions.length : 0)), "neutral");
     setText("ov-drawdown", fmtPct(d.drawdown_pct), d.drawdown_pct > 0.05 ? "negative" : "neutral");
     var srcEl = document.getElementById("ov-data-source");
     if (srcEl) srcEl.textContent = d.source || d.broker || "";
