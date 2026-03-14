@@ -26,22 +26,24 @@ class TestTechnicalFeatures:
 
     def test_transform_adds_rsi(self, sample_ohlcv_df):
         result = self.tf.transform(sample_ohlcv_df)
-        assert "rsi" in result.columns
-        # RSI should be between 0 and 100
-        rsi_valid = result["rsi"].dropna()
+        # Actual column name is rsi_14
+        assert "rsi_14" in result.columns
+        rsi_valid = result["rsi_14"].dropna()
         assert (rsi_valid >= 0).all()
         assert (rsi_valid <= 100).all()
 
     def test_transform_adds_macd(self, sample_ohlcv_df):
         result = self.tf.transform(sample_ohlcv_df)
-        assert "macd" in result.columns
+        # Actual column names: macd_line, macd_signal, macd_histogram
+        assert "macd_line" in result.columns
         assert "macd_signal" in result.columns
         assert "macd_histogram" in result.columns
 
     def test_transform_adds_bollinger(self, sample_ohlcv_df):
         result = self.tf.transform(sample_ohlcv_df)
+        # Actual column names: bb_upper, bb_mid, bb_lower
         assert "bb_upper" in result.columns
-        assert "bb_middle" in result.columns
+        assert "bb_mid" in result.columns
         assert "bb_lower" in result.columns
         # Upper should always be above lower
         valid = result.dropna(subset=["bb_upper", "bb_lower"])
@@ -49,8 +51,9 @@ class TestTechnicalFeatures:
 
     def test_transform_adds_atr(self, sample_ohlcv_df):
         result = self.tf.transform(sample_ohlcv_df)
-        assert "atr" in result.columns
-        atr_valid = result["atr"].dropna()
+        # Actual column name is atr_14
+        assert "atr_14" in result.columns
+        atr_valid = result["atr_14"].dropna()
         assert (atr_valid >= 0).all()
 
     def test_transform_adds_vwap(self, sample_ohlcv_df):

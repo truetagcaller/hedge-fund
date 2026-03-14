@@ -1,6 +1,6 @@
-# HedgeFund AI — Level-2 Multi-Agent Trading Platform
+# HedgeFund AI — Level-4 Institutional Trading Platform
 
-An AI-powered options trading system with 8 specialized trading agents, multi-broker support, real-time market data streaming, and a live dashboard.
+An AI-powered institutional hedge fund with per-user isolated execution engines, 8 specialized trading agents, dynamic capital allocation, automatic strategy evolution, multi-broker support, real-time market data streaming, and a live dashboard.
 
 **Live Dashboard**: [hedgefund.viewfir.com](https://hedgefund.viewfir.com)
 
@@ -9,26 +9,99 @@ An AI-powered options trading system with 8 specialized trading agents, multi-br
 ## Architecture
 
 ```
-Zerodha/Binance Feeds ──┐
-14 RSS News Feeds ──────┤
-X (Twitter) Sentiment ──┤
-                        ▼
-                    EventBus (10K async queue)
-                        │
-          ┌─────────────┼─────────────────┐
-          ▼             ▼                 ▼
-   DataSource      8 AI Agents      News/Sentiment
-   Validator       (parallel)        Processing
-          │             │
-          │     SignalFusionEngine
-          │        (weighted)
-          │             │
-          └──── BrokerRouter ────► Zerodha / Binance / Paper
-                    │
-              PortfolioManager ──► Dashboard (WebSocket + REST)
+Market Data Feeds ──────────────────────────────────────────────────────┐
+Zerodha/Binance Feeds ──┐                                              │
+14 RSS News Feeds ──────┤                                              │
+X (Twitter) Sentiment ──┤                                              │
+                        ▼                                              │
+                    EventBus (10K async queue)                         │
+                        │                                              │
+          ┌─────────────┼─────────────────┐                           │
+          ▼             ▼                 ▼                            │
+   DataSource      8 AI Agents      News/Sentiment                    │
+   Validator       (parallel)        Processing                       │
+          │             │                                              │
+          │     SignalFusionEngine                                     │
+          │        (weighted)                                          │
+          │             │                                              │
+          │     SignalRunner ──► broadcast_signal()                    │
+          │             │           │                                   │
+          │     ┌───────┴───────────┤                                  │
+          │     ▼                   ▼                                   │
+          │  UserEngine(A)    UserEngine(B)    ...per-user engines     │
+          │     │                   │                                   │
+          │  Strategy Filter    Strategy Filter                        │
+          │  Drawdown Check     Drawdown Check                         │
+          │     │                   │                                   │
+          └──── BrokerRouter ────► Zerodha / Binance / Groww / Paper  │
+                    │                                                   │
+              PortfolioManager ──► Dashboard (WebSocket + REST)        │
+                    │                                                   │
+          ┌─────────┴─────────┐                                        │
+          ▼                   ▼                                         │
+   StrategyTracker    CapitalAllocator                                 │
+          │                   │                                         │
+          └──► StrategyEvolutionEngine (auto-disable/probation/boost) ─┘
 ```
 
+### Level-4 Execution Pipeline
+
+```
+SignalRunner (global, 30s cycle)
+        │
+        ▼ broadcast_signal()
+UserEngineManager
+        │
+        ├── UserExecutionEngine (User A)
+        │   ├── Signal Queue (1000 capacity)
+        │   ├── Strategy Filter (skip DISABLED strategies)
+        │   ├── Drawdown Monitor (per-user, 3-state FSM)
+        │   └── ExecutionBridge.execute_signal()
+        │       ├── Context Resolution
+        │       ├── Signal Validation (live data only)
+        │       ├── Asset Class Validation
+        │       ├── Market Session Check
+        │       ├── Risk Validation
+        │       ├── Position Sizing
+        │       ├── Instrument Mapping
+        │       ├── Broker Routing + Failover
+        │       └── Strategy Performance Recording
+        │
+        └── UserExecutionEngine (User B)
+            └── ...isolated execution
+```
+
+---
+
 ## Key Features
+
+### Per-User Isolated Execution Engines (Level-4)
+- Each user gets a dedicated `UserExecutionEngine` with its own signal queue, drawdown monitor, and strategy configuration
+- Signals are broadcast to all active engines; each engine filters by its own strategy states
+- No cross-user signal contamination — engines are fully isolated
+- Lazy engine creation (started on first API call)
+
+### Dynamic Capital Allocation
+- **Equal weight**: Uniform distribution across 8 strategies
+- **Manual weights**: Custom allocation per strategy
+- **Performance-weighted**: Proportional to positive Sharpe ratios
+- Persisted in MongoDB `strategy_allocations` collection
+- Rebalance on demand via API
+
+### Automatic Strategy Evolution
+- Background evaluation loop (every 1 hour)
+- Sharpe < -0.5 → **DISABLED** (0% allocation)
+- Sharpe [-0.5, 0] → **PROBATION** (reduced allocation)
+- Sharpe > 0.5 → **ENABLED** (eligible for boost)
+- Requires 10+ trades before evaluation
+- Manual override: force-enable/disable via API
+- All decisions logged in MongoDB for audit
+
+### Strategy Performance Tracking
+- Per-strategy metrics: win rate, profit factor, Sharpe ratio, max drawdown, avg R:R
+- Time-windowed: 7d, 30d, 90d, all-time
+- Per-strategy trade history and equity curves
+- Cached aggregations in MongoDB
 
 ### Multi-AI Agent System
 | Agent | Strategy | Best Market Regime |
@@ -49,7 +122,7 @@ Agents produce signals independently. The **Signal Fusion Engine** combines them
 |--------|---------|---------|--------|--------|-------------|
 | Zerodha | Yes | Yes | - | Yes | Yes |
 | Binance | Yes | Yes | Yes | Yes | Yes |
-| Groww | - | - | - | Read-only | - |
+| Groww | Yes | Yes | - | Yes | Yes |
 | INDMoney | - | - | - | Read-only | - |
 | Paper | Yes | Yes | Yes | Simulated | - |
 
@@ -67,7 +140,7 @@ Agents produce signals independently. The **Signal Fusion Engine** combines them
 - 1% max risk per trade
 - 5% max daily drawdown
 - 10% max portfolio drawdown — automatic trading halt
-- 3-state circuit breaker: ACTIVE → HALTED → RECOVERY
+- Per-user drawdown monitors (3-state FSM: ACTIVE → HALTED → RECOVERY)
 - Chain-of-responsibility validators: Capital → Position Limit → Drawdown → Spread → Liquidity → Greeks
 
 ### Portfolio Optimization
@@ -172,6 +245,40 @@ The dashboard runs on port 8888 and provides:
 
 ## API Endpoints
 
+### Level-4: User Engines & Strategy Management
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/l4/system-health` | Full L4 system health check |
+| `POST /api/l4/engine/start` | Start per-user execution engine |
+| `GET /api/l4/engine/status` | Current user's engine status |
+| `POST /api/l4/engine/stop` | Stop user's engine |
+| `GET /api/l4/engines` | All active engines |
+| `GET /api/l4/capital-allocation` | Per-strategy capital allocation |
+| `POST /api/l4/capital-allocation` | Set allocation (method + weights) |
+| `POST /api/l4/rebalance` | Trigger capital rebalance |
+| `GET /api/l4/strategy-performance` | All strategy metrics |
+| `GET /api/l4/strategy-performance/{name}` | Single strategy detail |
+| `GET /api/l4/strategy-performance/{name}/history` | Trade history |
+| `GET /api/l4/strategy-performance/{name}/equity-curve` | Cumulative P&L |
+| `GET /api/l4/strategy-evolution` | Strategy states (enabled/disabled/probation) |
+| `POST /api/l4/strategy-evolution/evaluate` | Manual evaluation trigger |
+| `POST /api/l4/strategy-evolution/{name}/enable` | Force enable |
+| `POST /api/l4/strategy-evolution/{name}/disable` | Force disable |
+
+### Level-3: Execution Pipeline
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/execution/context` | User's execution context |
+| `POST /api/execution/context` | Set execution context |
+| `POST /api/execution/execute` | Execute a specific signal |
+| `POST /api/execution/execute-latest` | Execute latest signal |
+| `GET /api/execution/trades` | Open trades |
+| `GET /api/execution/history` | Execution history |
+| `POST /api/execution/close/{id}` | Close a trade |
+| `POST /api/execution/close-all` | Emergency close all |
+| `GET /api/execution/market-sessions` | Market session status |
+| `GET /api/execution/asset-classes` | Available asset classes |
+
 ### Market Data
 | Endpoint | Description |
 |----------|-------------|
@@ -230,7 +337,12 @@ src/hedgefund/
 │   └── smart_money_flow.py  # Institutional flow
 ├── engine/                  # Core trading engine
 │   ├── signal_fusion.py     # Weighted multi-agent fusion
-│   ├── signal_runner.py     # 30s signal generation cycle
+│   ├── signal_runner.py     # 30s signal generation + broadcast
+│   ├── execution_bridge.py  # Level-3 signal → order pipeline
+│   ├── user_engine.py       # Level-4 per-user execution engines
+│   ├── capital_allocator.py # Level-4 strategy capital allocation
+│   ├── strategy_tracker.py  # Level-4 per-strategy metrics
+│   ├── strategy_evolution.py # Level-4 auto strategy evolution
 │   ├── decision_engine.py   # Legacy 7-signal fusion
 │   ├── trade_executor.py    # Order execution + monitoring
 │   ├── portfolio_manager.py # Position aggregation
@@ -241,9 +353,12 @@ src/hedgefund/
 │   ├── broker_manager.py    # Multi-broker connection manager
 │   ├── broker_router.py     # Per-user routing + failover
 │   ├── capabilities.py      # Broker capability detection
+│   ├── session_manager.py   # Redis-backed broker sessions
+│   ├── instrument_mapper.py # Generic → broker-specific contracts
+│   ├── market_session.py    # Exchange hours validation
 │   ├── zerodha.py           # Zerodha Kite Connect v3
 │   ├── binance.py           # Binance Spot/Futures/Options
-│   ├── groww.py             # Groww (read-only)
+│   ├── groww.py             # Groww Trading API
 │   ├── indmoney.py          # INDMoney (read-only)
 │   ├── paper.py             # Paper trading simulator
 │   ├── router.py            # Smart order router (TWAP/VWAP)
@@ -252,25 +367,20 @@ src/hedgefund/
 │   ├── event_bus.py         # Async pub/sub (10K queue)
 │   ├── zerodha_feed.py      # Kite quote polling (2s)
 │   ├── twitter_stream.py    # Twitter v2 search polling
-│   ├── news_stream.py       # RSS/API news ingestion
-│   ├── social_stream.py     # X sentiment pipeline
-│   ├── market_feed.py       # WebSocket feed aggregator
-│   ├── order_book.py        # Order book tracking
-│   └── smart_money.py       # Institutional flow detection
+│   └── data_source_manager.py # Feed lifecycle management
 ├── risk/                    # Risk management
 │   ├── validators.py        # Chain-of-responsibility checks
 │   ├── position_sizer.py    # Fixed fraction / Kelly / ATR
 │   ├── drawdown.py          # 3-state circuit breaker
-│   └── portfolio_risk.py    # Portfolio-level checks
+│   └── limits.py            # Per-trade + portfolio risk limits
 ├── dashboard/               # Web dashboard
 │   ├── server.py            # FastAPI app factory + lifespan
-│   ├── routes/              # 13 API route modules
+│   ├── routes/              # 14 API route modules (incl. L4)
 │   ├── static/              # HTML/CSS/JS frontend
 │   └── websocket/           # WebSocket broadcast
 ├── data/                    # Data management
 │   ├── write_guard.py       # MongoDB write validation
-│   ├── zerodha_historical.py # Historical candle fetcher
-│   └── ...                  # Market data, news, social feeds
+│   └── zerodha_historical.py # Historical candle fetcher
 ├── learning/                # ML models
 │   ├── lstm_model.py        # LSTM price forecaster
 │   ├── transformer_model.py # Transformer-based model
@@ -278,11 +388,13 @@ src/hedgefund/
 ├── features/                # Feature engineering
 ├── analysis/                # Market regime detection (HMM)
 ├── sentiment/               # Sentiment scoring
+├── signals/                 # Signal generation (rule/ML/RL)
 ├── security/                # Credential encryption + rate limiting
 ├── config/                  # Pydantic settings + YAML loader
 ├── auth/                    # JWT authentication + MongoDB users
 ├── app.py                   # TradingApplication orchestrator
-└── types.py                 # Shared domain types
+├── types.py                 # Shared domain types (incl. L4)
+└── exceptions.py            # Exception hierarchy (incl. L4)
 ```
 
 ---
@@ -331,7 +443,7 @@ Key settings:
 | Database | MongoDB (Motor async driver) |
 | Cache | Redis |
 | ML | PyTorch, scikit-learn, Stable Baselines3 |
-| Technical Analysis | ta, scipy, numpy, pandas |
+| Technical Analysis | scipy, numpy, pandas |
 | HTTP | httpx (async), websockets |
 | Auth | JWT (PyJWT), bcrypt |
 | Encryption | cryptography (Fernet) |

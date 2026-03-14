@@ -127,6 +127,41 @@ class MongoDB:
             IndexModel([("user_id", ASCENDING), ("source_id", ASCENDING)], unique=True),
         ])
 
+        # -- Level-4 collections -----------------------------------------------
+
+        # strategy_trades
+        await self._db.strategy_trades.create_indexes([
+            IndexModel([
+                ("user_id", ASCENDING),
+                ("strategy_name", ASCENDING),
+                ("exit_time", DESCENDING),
+            ]),
+            IndexModel([("user_id", ASCENDING), ("exit_time", DESCENDING)]),
+        ])
+
+        # strategy_performance (cached aggregations)
+        await self._db.strategy_performance.create_indexes([
+            IndexModel(
+                [("user_id", ASCENDING), ("strategy_name", ASCENDING),
+                 ("window", ASCENDING)],
+                unique=True,
+            ),
+        ])
+
+        # strategy_allocations
+        await self._db.strategy_allocations.create_indexes([
+            IndexModel(
+                [("user_id", ASCENDING), ("strategy_name", ASCENDING)],
+                unique=True,
+            ),
+        ])
+
+        # strategy_evolution_log
+        await self._db.strategy_evolution_log.create_indexes([
+            IndexModel([("user_id", ASCENDING), ("timestamp", DESCENDING)]),
+            IndexModel([("user_id", ASCENDING), ("strategy_name", ASCENDING)]),
+        ])
+
         log.info("mongodb.indexes_created")
 
     # -- collection properties -----------------------------------------------
@@ -185,6 +220,28 @@ class MongoDB:
     def data_sources(self) -> motor.motor_asyncio.AsyncIOMotorCollection:
         assert self._db is not None, "Call connect() first"
         return self._db.data_sources
+
+    # -- Level-4 collections ---------------------------------------------------
+
+    @property
+    def strategy_trades(self) -> motor.motor_asyncio.AsyncIOMotorCollection:
+        assert self._db is not None, "Call connect() first"
+        return self._db.strategy_trades
+
+    @property
+    def strategy_performance(self) -> motor.motor_asyncio.AsyncIOMotorCollection:
+        assert self._db is not None, "Call connect() first"
+        return self._db.strategy_performance
+
+    @property
+    def strategy_allocations(self) -> motor.motor_asyncio.AsyncIOMotorCollection:
+        assert self._db is not None, "Call connect() first"
+        return self._db.strategy_allocations
+
+    @property
+    def strategy_evolution_log(self) -> motor.motor_asyncio.AsyncIOMotorCollection:
+        assert self._db is not None, "Call connect() first"
+        return self._db.strategy_evolution_log
 
 
 def get_database() -> MongoDB:

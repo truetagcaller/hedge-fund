@@ -124,3 +124,60 @@ class AgentNotActiveError(AgentError):
 
 class ForbiddenWriteError(HedgeFundError):
     """Attempted to write forbidden data to database."""
+
+
+# ── Execution Pipeline Errors ────────────────────────────────────
+
+class MarketClosedError(ExecutionError):
+    """Market is closed — trading not permitted at this time."""
+
+    def __init__(self, market: str, message: str = ""):
+        self.market = market
+        super().__init__(message or f"Market {market} is currently closed.")
+
+
+class AssetClassMismatchError(ExecutionError):
+    """Signal asset class does not match execution context."""
+
+    def __init__(self, expected: str, actual: str):
+        self.expected = expected
+        self.actual = actual
+        super().__init__(
+            f"Asset class mismatch: context expects {expected}, signal is {actual}"
+        )
+
+
+class InstrumentMappingError(ExecutionError):
+    """Failed to resolve a generic symbol to a broker-specific contract."""
+
+    def __init__(self, symbol: str, reason: str = ""):
+        self.symbol = symbol
+        super().__init__(
+            f"Cannot map instrument {symbol!r}: {reason}" if reason
+            else f"Cannot map instrument {symbol!r} to a broker contract."
+        )
+
+
+class BrokerCapabilityError(ExecutionError):
+    """Broker does not support the requested asset class or operation."""
+
+    def __init__(self, broker: str, capability: str):
+        self.broker = broker
+        self.capability = capability
+        super().__init__(
+            f"Broker {broker!r} does not support {capability}."
+        )
+
+
+# ── Level-4 Errors ─────────────────────────────────────────
+
+class UserEngineError(HedgeFundError):
+    """Error in the per-user execution engine."""
+
+
+class CapitalAllocationError(HedgeFundError):
+    """Error in capital allocation across strategies."""
+
+
+class StrategyEvolutionError(HedgeFundError):
+    """Error in strategy evolution/adaptation."""

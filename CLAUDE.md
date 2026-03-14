@@ -49,9 +49,108 @@ PYTHONPATH=src nohup python3 -m uvicorn hedgefund.dashboard.server:create_app --
 
 ## Architecture
 
-### Level-2 Hedge Fund Architecture
+### Level-4 Institutional Hedge Fund Architecture
 
-The system is a **multi-AI agent, multi-broker trading platform** built around an async `EventBus` (pub/sub with 10K queue). Supports simultaneous connections to multiple brokers with per-user broker switching, capability-based routing, and automatic failover.
+The system is a **multi-user institutional hedge fund platform** with per-user isolated execution engines, per-strategy capital allocation, automatic strategy evolution, and the full Level-3 execution pipeline. Built around an async `EventBus` (pub/sub with 10K queue). Supports simultaneous connections to multiple brokers with per-user broker switching, capability-based routing, asset-class validation, automated trade execution from AI signals, and automatic failover.
+
+### Level-4 Per-User Execution Architecture
+
+```
+UserEngineManager (factory + lifecycle)
+        ↓
+UserExecutionEngine (per user_id)
+├── TradingExecutionContext (broker, asset class, mode)
+├── DrawdownMonitor (per-user risk state, 3-state FSM)
+├── Signal Queue (asyncio.Queue, 1000 capacity)
+├── Strategy States (enabled/disabled/probation per strategy)
+└── delegates to → ExecutionBridge.execute_signal()
+
+SignalRunner → broadcast_signal() → all active UserExecutionEngines
+                                          ↓
+                              Strategy filter (skip DISABLED)
+                              Drawdown check (skip if HALTED)
+                              Execute via ExecutionBridge
+                              Record via StrategyPerformanceTracker
+```
+
+### Level-4 Strategy Lifecycle
+
+```
+CapitalAllocator                    StrategyEvolutionEngine
+├── equal weight (default)          ├── eval every 1 hour
+├── manual weights                  ├── Sharpe < -0.5 → DISABLED
+├── performance-weighted            ├── Sharpe [-0.5, 0] → PROBATION
+└── MVO/Kelly/Risk Parity           ├── Sharpe > 0.5 → ENABLED (boost)
+    (via PortfolioOptimizer)        └── logs decisions to MongoDB
+```
+
+### Level-4 Components
+
+| Component | Module | Role |
+|-----------|--------|------|
+| **UserExecutionEngine** | `engine/user_engine.py` | Per-user isolated engine: signal queue, drawdown, strategies |
+| **UserEngineManager** | `engine/user_engine.py` | Factory/lifecycle for all user engines, signal broadcast |
+| **CapitalAllocator** | `engine/capital_allocator.py` | Per-strategy capital distribution (equal/manual/performance) |
+| **StrategyPerformanceTracker** | `engine/strategy_tracker.py` | Per-strategy metrics: win_rate, sharpe, profit_factor, drawdown |
+| **StrategyEvolutionEngine** | `engine/strategy_evolution.py` | Auto-disable/probation/boost based on rolling performance |
+
+### Level-4 MongoDB Collections
+
+| Collection | Purpose | Key Indexes |
+|------------|---------|-------------|
+| `strategy_trades` | Per-strategy trade records | (user_id, strategy_name, exit_time) |
+| `strategy_performance` | Cached metrics per window | (user_id, strategy_name, window) UNIQUE |
+| `strategy_allocations` | Capital allocation per strategy | (user_id, strategy_name) UNIQUE |
+| `strategy_evolution_log` | Evolution decision audit trail | (user_id, timestamp) |
+
+### Level-4 API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/l4/engines` | GET | All active user engines |
+| `/api/l4/engine/status` | GET | Current user's engine status |
+| `/api/l4/engine/start` | POST | Start engine for current user |
+| `/api/l4/engine/stop` | POST | Stop engine for current user |
+| `/api/l4/capital-allocation` | GET | Per-strategy allocation |
+| `/api/l4/capital-allocation` | POST | Set allocation (method + weights) |
+| `/api/l4/rebalance` | POST | Trigger capital rebalance |
+| `/api/l4/strategy-performance` | GET | All strategy metrics (query: window) |
+| `/api/l4/strategy-performance/{name}` | GET | Single strategy detail |
+| `/api/l4/strategy-performance/{name}/history` | GET | Trade history |
+| `/api/l4/strategy-performance/{name}/equity-curve` | GET | Cumulative P&L |
+| `/api/l4/strategy-evolution` | GET | Strategy states |
+| `/api/l4/strategy-evolution/evaluate` | POST | Manual evaluation trigger |
+| `/api/l4/strategy-evolution/{name}/enable` | POST | Force enable |
+| `/api/l4/strategy-evolution/{name}/disable` | POST | Force disable |
+| `/api/l4/system-health` | GET | Full L4 system health |
+
+### Level-4 Types (`types.py`)
+
+- `UserEngineState` enum: INITIALIZING, ACTIVE, PAUSED, SHUTDOWN
+- `StrategyState` enum: ENABLED, DISABLED, PROBATION
+- `StrategyAllocation` dataclass: strategy_name, user_id, allocation_pct, allocated_capital, method
+- `StrategyMetrics` dataclass: win_rate, profit_factor, sharpe_ratio, max_drawdown, avg_rr, total_pnl
+
+### Level-3 Execution Pipeline
+
+```
+AI Agents → SignalFusionEngine → FusedSignal (MongoDB)
+                                       ↓
+                              ExecutionBridge (engine/execution_bridge.py)
+                                       ↓
+                              TradingExecutionContext (per-user)
+                                       ↓
+                        ┌── Signal Validation (is_live_data, action)
+                        ├── Asset Class Validation (broker capabilities)
+                        ├── Market Session Check (exchange hours)
+                        ├── Risk Validation (risk manager pipeline)
+                        ├── Position Sizing (fixed_fraction/kelly/vol)
+                        └── Instrument Mapping (generic → broker contract)
+                                       ↓
+                              BrokerRouter (per-user, per-trade)
+                                       ↓
+                              Broker Adapter → Order Execution
+```
 
 ### Event-Driven Pipeline
 
@@ -59,6 +158,7 @@ The system is a **multi-AI agent, multi-broker trading platform** built around a
 Zerodha/Binance feeds → EventBus → DataSourceValidator (gate)
                                   → 8 AI Agents → SignalFusionEngine → BrokerRouter → Active Broker
                                   → SignalRunner (30s cycle) → MongoDB signals
+                                  → ExecutionBridge → InstrumentMapper → BrokerRouter → Order
                                   → PortfolioManager → WebSocket Dashboard
 ```
 
@@ -77,6 +177,10 @@ Zerodha/Binance feeds → EventBus → DataSourceValidator (gate)
 | **BrokerManager** | `execution/broker_manager.py` | Multi-broker connection manager, real adapter factory |
 | **BrokerRouter** | `execution/broker_router.py` | Per-user broker selection, failover, capability-based routing |
 | **BrokerCapabilities** | `execution/capabilities.py` | Declares what each broker supports (options, futures, crypto, etc.) |
+| **ExecutionBridge** | `engine/execution_bridge.py` | Bridges AI signals → validated orders, auto-execution pipeline |
+| **InstrumentMapper** | `execution/instrument_mapper.py` | Resolves generic symbols (NIFTY) to broker-specific contracts |
+| **MarketSessionManager** | `execution/market_session.py` | Validates trading hours per exchange (NSE, NFO, MCX, crypto 24/7) |
+| **BrokerSessionManager** | `execution/session_manager.py` | Redis-backed persistent broker session + context tracking |
 | **ZerodhaMarketFeed** | `streaming/zerodha_feed.py` | Polls Kite Quote API every 2s, publishes TICK events |
 | **ZerodhaHistorical** | `data/zerodha_historical.py` | Historical OHLCV candles from Kite Connect |
 | **SmartOrderRouter** | `execution/router.py` | TWAP/VWAP execution, pre-trade validation, retries |
@@ -166,9 +270,45 @@ In dashboard mode, `SignalRunner` (`engine/signal_runner.py`) runs every 30s:
 2. Builds market_data dict for each instrument
 3. Runs all 8 agents via `SignalFusionEngine`
 4. Stores fused signals in MongoDB `signals` collection
-5. Signals appear on dashboard Overview via `GET /api/signals`
+5. Broadcasts signal to all active `UserExecutionEngine`s via `UserEngineManager`
+6. Signals appear on dashboard Overview via `GET /api/signals`
 
 Signals require: 2+ agents agreeing, 50%+ confidence, 1.5+ risk-reward ratio.
+
+### Signal-to-Execution Pipeline (Level-3)
+
+`ExecutionBridge` (`engine/execution_bridge.py`) connects AI signals to live order execution:
+
+1. **Context resolution** — reads `TradingExecutionContext` (user_id, active_broker, asset_class, trading_mode)
+2. **Signal validation** — requires `is_live_data=True`, non-NO_TRADE action
+3. **Asset class validation** — checks broker capabilities via `BrokerRouter.validate_asset_class()`; auto-reroutes to capable broker if needed
+4. **Market session check** — `MarketSessionManager` validates exchange hours (skipped for paper mode)
+5. **Risk validation** — runs through `RiskManager.validate_signal()` pipeline
+6. **Position sizing** — `PositionSizer.fixed_fraction()` (1% risk per trade)
+7. **Instrument mapping** — `InstrumentMapper` resolves generic symbol → broker-specific contract (e.g. `NIFTY` → `NFO:NIFTY26031922000CE`)
+8. **Order routing** — `BrokerRouter.route_with_context()` submits to active broker with failover
+9. **Result recording** — updates signal outcome in MongoDB, publishes FILL event
+
+**Execution modes:**
+- **Manual** (`auto_execute=False`): signals appear in dashboard, user triggers via `POST /api/execution/execute`
+- **Auto** (`auto_execute=True`): bridge polls MongoDB for active signals every 30s and executes qualifying ones
+
+**Market sessions (MarketSessionManager):**
+
+| Market | Hours (local) | Days |
+|--------|--------------|------|
+| NSE/BSE | 09:15–15:30 IST | Mon–Fri |
+| NFO/BFO | 09:15–15:30 IST | Mon–Fri |
+| MCX | 09:00–23:30 IST | Mon–Fri |
+| CDS | 09:00–17:00 IST | Mon–Fri |
+| Crypto (SPOT/USDM/COINM/EAPI) | 24/7 | All days |
+
+**Instrument mapping (InstrumentMapper):**
+- Options: `NIFTY` + strike + expiry → `NFO:NIFTY{YYMMDD}{STRIKE}{CE/PE}`
+- Equity: `RELIANCE` → `NSE:RELIANCE`
+- Crypto: `BTC` → `BTCUSDT`
+- Futures: `NIFTY` + expiry → `NFO:NIFTY{YYMM}FUT`
+- Commodity: `GOLD` → `MCX:GOLD{YYMM}FUT`
 
 ### Data Source Validation (CRITICAL)
 
@@ -230,6 +370,8 @@ FastAPI app factory in `dashboard/server.py`. REST routes under `/api/*`, WebSoc
 4. Twitter poll stream start
 5. Zerodha market feed start (live quote polling)
 6. AI Signal Runner start (agents + fusion, 30s cycle)
+7. Execution Bridge start (signal → order pipeline, BrokerSessionManager)
+8. Level-4: StrategyPerformanceTracker, CapitalAllocator, StrategyEvolutionEngine, UserEngineManager init + wiring
 
 **Dashboard API Endpoints:**
 
@@ -258,6 +400,17 @@ FastAPI app factory in `dashboard/server.py`. REST routes under `/api/*`, WebSoc
 | `GET /api/auth/twitter/login` | `routes/twitter_oauth.py` | Twitter OAuth redirect |
 | `GET /twitter` | `routes/twitter_webhook.py` | Twitter CRC challenge |
 | `POST /twitter` | `routes/twitter_webhook.py` | Twitter webhook events |
+| `GET /api/execution/context` | `routes/execution.py` | Get user's execution context |
+| `POST /api/execution/context` | `routes/execution.py` | Set execution context (broker, asset class, mode) |
+| `POST /api/execution/execute` | `routes/execution.py` | Execute a specific signal by ID |
+| `POST /api/execution/execute-latest` | `routes/execution.py` | Execute most recent active signal |
+| `GET /api/execution/trades` | `routes/execution.py` | Open trades for user |
+| `GET /api/execution/history` | `routes/execution.py` | Execution history |
+| `POST /api/execution/close/{trade_id}` | `routes/execution.py` | Close a specific trade |
+| `POST /api/execution/close-all` | `routes/execution.py` | Emergency close all user trades |
+| `GET /api/execution/market-sessions` | `routes/execution.py` | All market sessions with open/closed status |
+| `GET /api/execution/asset-classes` | `routes/execution.py` | Available asset classes with broker support |
+| `GET /api/execution/settings` | `routes/execution.py` | User's execution configuration |
 
 **Dashboard UI Features:**
 - Broker switcher dropdown in header (uses `authFetch` for authenticated API calls)
@@ -269,11 +422,16 @@ FastAPI app factory in `dashboard/server.py`. REST routes under `/api/*`, WebSoc
 
 **Important**: `market_intel.py` was purged of ALL random data generators. Every endpoint returns real data or explicit `"DATA SOURCE NOT CONNECTED"` / zeros.
 
-App state holds: `broker_manager`, `broker_router`, `ws_manager`, `data_source_manager`, `data_source_validator`, `agent_registry`, `signal_fusion`, `signal_runner`, `twitter_stream`, `zerodha_feed`, `market_data_provider`.
+App state holds: `broker_manager`, `broker_router`, `ws_manager`, `data_source_manager`, `data_source_validator`, `agent_registry`, `signal_fusion`, `signal_runner`, `execution_bridge`, `session_manager`, `twitter_stream`, `zerodha_feed`, `market_data_provider`, `engine_manager` (L4), `capital_allocator` (L4), `strategy_tracker` (L4), `strategy_evolution` (L4).
 
 ### Domain Types
 
-All shared types live in `types.py`: enums (`Side`, `OptionType`, `OrderType`, `OrderStatus`, `SignalAction`, `MarketRegime`, `DataOrigin`), dataclasses (`OHLCV`, `OptionContract`, `Greeks`, `TradeSignal`, `Order`, `Position`, `PortfolioSnapshot`, `TradeRecord`, `BacktestMetrics`). Every module communicates through these types.
+All shared types live in `types.py`: enums (`Side`, `OptionType`, `OrderType`, `OrderStatus`, `SignalAction`, `MarketRegime`, `DataOrigin`, `AssetClass`, `TradingMode`), dataclasses (`OHLCV`, `OptionContract`, `Greeks`, `TradeSignal`, `Order`, `Position`, `PortfolioSnapshot`, `TradeRecord`, `BacktestMetrics`, `TradingExecutionContext`). Every module communicates through these types.
+
+**Level-3 types:**
+- `AssetClass` enum: EQUITY, FUTURES, OPTIONS, COMMODITY, CRYPTO
+- `TradingMode` enum: PAPER, LIVE, BACKTEST
+- `TradingExecutionContext`: user_id, active_broker, asset_class, trading_mode, broker_account_id, market_segment — determines where and how trades execute
 
 ### Risk Management
 

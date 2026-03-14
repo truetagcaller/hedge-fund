@@ -13,16 +13,18 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
-from hedgefund.exceptions import BrokerConnectionError, ExecutionError
+from hedgefund.exceptions import (
+    BrokerCapabilityError,
+    BrokerConnectionError,
+    ExecutionError,
+)
 from hedgefund.execution.broker_manager import BrokerManager
 from hedgefund.execution.capabilities import (
-    BROKER_CAPABILITIES,
     can_trade,
     get_capabilities,
-    supports_instrument,
 )
 from hedgefund.logger import get_logger
-from hedgefund.types import Order
+from hedgefund.types import AssetClass, Order, TradingExecutionContext
 
 log = get_logger(__name__)
 
@@ -120,6 +122,74 @@ class BrokerRouter:
                 },
                 upsert=True,
             )
+
+    # ── Asset-class validation ──────────────────────────────────────────
+
+    def validate_asset_class(
+        self, broker_type: str, asset_class: AssetClass,
+    ) -> bool:
+        """Return ``True`` if *broker_type* supports the given *asset_class*."""
+        try:
+            caps = get_capabilities(broker_type)
+        except KeyError:
+            return False
+
+        mapping: dict[AssetClass, bool] = {
+            AssetClass.EQUITY: caps.equity_trading,
+            AssetClass.OPTIONS: caps.options_trading,
+            AssetClass.FUTURES: caps.futures_trading,
+            AssetClass.COMMODITY: caps.futures_trading,  # MCX uses futures infra
+            AssetClass.CRYPTO: caps.crypto_trading,
+        }
+        return mapping.get(asset_class, False)
+
+    def find_broker_for_asset_class(
+        self, user_id: str, asset_class: AssetClass,
+    ) -> str | None:
+        """Find a connected broker that supports *asset_class*."""
+        for bid in self._manager.get_connected_broker_ids():
+            btype = self._get_broker_type_sync(bid)
+            if can_trade(btype) and self.validate_asset_class(btype, asset_class):
+                return bid
+        return None
+
+    # ── Context-aware routing ─────────────────────────────────────────
+
+    async def route_with_context(
+        self,
+        ctx: TradingExecutionContext,
+        order: Order,
+        broker_id: str | None = None,
+    ) -> Order:
+        """Route an order using a full execution context.
+
+        Validates asset-class support before routing.  Falls back to
+        :meth:`route_order` for broker resolution and failover.
+        """
+        target = broker_id or ctx.active_broker
+
+        # Validate asset-class capability
+        if target:
+            btype = self._get_broker_type_sync(target)
+            if btype and not self.validate_asset_class(btype, ctx.asset_class):
+                # Try to find another broker that supports this asset class
+                alt = self.find_broker_for_asset_class(
+                    ctx.user_id, ctx.asset_class,
+                )
+                if alt is None:
+                    raise BrokerCapabilityError(
+                        target, ctx.asset_class.value,
+                    )
+                log.info(
+                    "broker_router.asset_class_reroute",
+                    user_id=ctx.user_id,
+                    original=target,
+                    rerouted_to=alt,
+                    asset_class=ctx.asset_class.value,
+                )
+                target = alt
+
+        return await self.route_order(ctx.user_id, order, broker_id=target)
 
     # ── Order routing ─────────────────────────────────────────────────────
 

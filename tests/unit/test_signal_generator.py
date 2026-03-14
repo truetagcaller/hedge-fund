@@ -3,7 +3,6 @@
 import pytest
 import pandas as pd
 import numpy as np
-from datetime import datetime
 
 from hedgefund.types import MarketRegime, SentimentResult, SignalAction
 
@@ -21,15 +20,14 @@ class TestRuleBasedSignals:
         from hedgefund.signals.rule_signal import RuleBasedSignalGenerator
 
         gen = RuleBasedSignalGenerator(
-            underlying="SPY",
-            min_confidence=0.5,
-            min_risk_reward=1.5,
+            params={"min_rr": 1.5},
+            strategy_name="test_rule",
         )
 
         import asyncio
         signals = asyncio.get_event_loop().run_until_complete(
             gen.generate(
-                features=bullish_df,
+                features_df=bullish_df,
                 regime=MarketRegime.LOW_VOL_BULLISH,
                 sentiment=sample_sentiment,
             )
@@ -61,18 +59,17 @@ class TestRuleBasedSignals:
         features = tf.transform(choppy)
 
         gen = RuleBasedSignalGenerator(
-            underlying="SPY",
-            min_confidence=0.8,  # High threshold
-            min_risk_reward=2.0,
+            params={"min_rr": 2.0},
+            strategy_name="test_choppy",
         )
 
         import asyncio
         signals = asyncio.get_event_loop().run_until_complete(
             gen.generate(
-                features=features,
+                features_df=features,
                 regime=MarketRegime.MEAN_REVERTING,
                 sentiment=SentimentResult("SPY", 0.0, 0.3, "test"),
             )
         )
-        # Should have fewer signals with high confidence threshold
+        # Should have fewer signals with high RR threshold
         assert len(signals) <= 5

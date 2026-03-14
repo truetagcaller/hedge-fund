@@ -81,6 +81,22 @@ class Timeframe(enum.Enum):
     D1 = "1d"
 
 
+class AssetClass(enum.Enum):
+    """Tradeable asset classes."""
+    EQUITY = "EQUITY"
+    FUTURES = "FUTURES"
+    OPTIONS = "OPTIONS"
+    COMMODITY = "COMMODITY"
+    CRYPTO = "CRYPTO"
+
+
+class TradingMode(enum.Enum):
+    """Trading execution mode."""
+    PAPER = "PAPER"
+    LIVE = "LIVE"
+    BACKTEST = "BACKTEST"
+
+
 # ── Market Data ────────────────────────────────────────────────────────────────
 
 @dataclass(frozen=True, slots=True)
@@ -304,3 +320,110 @@ class TradeRecord:
     @property
     def is_winner(self) -> bool:
         return self.pnl > 0
+
+
+# ── Execution Context ────────────────────────────────────────────────────────
+
+@dataclass(slots=True)
+class TradingExecutionContext:
+    """Determines where and how trades are executed.
+
+    Every order submission must reference an execution context so the
+    broker router, risk manager, and instrument mapper all operate on
+    a consistent set of parameters.
+    """
+
+    user_id: str
+    active_broker: str
+    asset_class: AssetClass
+    trading_mode: TradingMode
+    broker_account_id: str = ""
+    market_segment: str = ""  # e.g. "NFO", "SPOT", "MCX"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "user_id": self.user_id,
+            "active_broker": self.active_broker,
+            "asset_class": self.asset_class.value,
+            "trading_mode": self.trading_mode.value,
+            "broker_account_id": self.broker_account_id,
+            "market_segment": self.market_segment,
+        }
+
+
+# ── Level-4: Per-User Engine & Strategy Management ───────────────────────────
+
+class UserEngineState(enum.Enum):
+    """Lifecycle state of a per-user execution engine."""
+    INITIALIZING = "INITIALIZING"
+    ACTIVE = "ACTIVE"
+    PAUSED = "PAUSED"
+    SHUTDOWN = "SHUTDOWN"
+
+
+class StrategyState(enum.Enum):
+    """Runtime state of a strategy within a user engine."""
+    ENABLED = "ENABLED"
+    DISABLED = "DISABLED"
+    PROBATION = "PROBATION"
+
+
+@dataclass(slots=True)
+class StrategyAllocation:
+    """Capital allocation for a single strategy within a user's portfolio."""
+    strategy_name: str
+    user_id: str
+    allocation_pct: float  # 0.0 to 1.0
+    allocated_capital: float
+    method: str  # "equal", "manual", "performance", "mvo", "kelly"
+    updated_at: datetime = field(default_factory=datetime.utcnow)
+
+    def to_dict(self) -> dict[str, Any]:
+        ua = self.updated_at
+        return {
+            "strategy_name": self.strategy_name,
+            "user_id": self.user_id,
+            "allocation_pct": round(self.allocation_pct, 6),
+            "allocated_capital": round(self.allocated_capital, 2),
+            "method": self.method,
+            "updated_at": ua.isoformat() if hasattr(ua, "isoformat") else str(ua),
+        }
+
+
+@dataclass(slots=True)
+class StrategyMetrics:
+    """Performance metrics for a strategy over a time window."""
+    strategy_name: str
+    user_id: str
+    window: str  # "7d", "30d", "all"
+    total_trades: int = 0
+    winning_trades: int = 0
+    losing_trades: int = 0
+    win_rate: float = 0.0
+    profit_factor: float = 0.0
+    sharpe_ratio: float = 0.0
+    max_drawdown: float = 0.0
+    avg_rr: float = 0.0
+    total_pnl: float = 0.0
+    avg_hold_minutes: float = 0.0
+    computed_at: datetime = field(default_factory=datetime.utcnow)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "strategy_name": self.strategy_name,
+            "user_id": self.user_id,
+            "window": self.window,
+            "total_trades": self.total_trades,
+            "winning_trades": self.winning_trades,
+            "losing_trades": self.losing_trades,
+            "win_rate": round(self.win_rate, 4),
+            "profit_factor": round(self.profit_factor, 4),
+            "sharpe_ratio": round(self.sharpe_ratio, 4),
+            "max_drawdown": round(self.max_drawdown, 4),
+            "avg_rr": round(self.avg_rr, 2),
+            "total_pnl": round(self.total_pnl, 2),
+            "avg_hold_minutes": round(self.avg_hold_minutes, 1),
+            "computed_at": self.computed_at.isoformat()
+            if hasattr(self.computed_at, "isoformat")
+            else str(self.computed_at),
+        }

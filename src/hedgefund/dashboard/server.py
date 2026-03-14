@@ -22,6 +22,8 @@ from hedgefund.dashboard.routes.backtest import router as backtest_router
 from hedgefund.dashboard.routes.broker_switch import router as broker_switch_router
 from hedgefund.dashboard.routes.brokers import router as brokers_router
 from hedgefund.dashboard.routes.data_sources import router as data_sources_router
+from hedgefund.dashboard.routes.execution import router as execution_router
+from hedgefund.dashboard.routes.l4 import router as l4_router
 from hedgefund.dashboard.routes.health import router as health_router
 from hedgefund.dashboard.routes.market_intel import router as market_intel_router
 from hedgefund.dashboard.routes.news_setup import router as news_setup_router
@@ -162,21 +164,103 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     except Exception:
         log.warning("signal_runner.start_failed", exc_info=True)
 
+    # 8. Start Execution Bridge (Level-3: signals → orders)
+    execution_bridge = None
+    try:
+        from hedgefund.engine.execution_bridge import ExecutionBridge
+        from hedgefund.execution.session_manager import BrokerSessionManager
+
+        session_mgr = BrokerSessionManager()  # memory-only; pass Redis later
+        execution_bridge = ExecutionBridge(
+            event_bus=dsm.event_bus,
+            broker_manager=app.state.broker_manager,
+            broker_router=app.state.broker_router,
+            session_manager=session_mgr,
+            db=db,
+            auto_execute=False,  # manual execution by default
+            poll_interval=30.0,
+        )
+        await execution_bridge.start()
+        app.state.execution_bridge = execution_bridge
+        app.state.session_manager = session_mgr
+        log.info("execution_bridge.started")
+    except Exception:
+        log.warning("execution_bridge.start_failed", exc_info=True)
+
+    # 9. Start Level-4 components (per-user engines, capital, evolution)
+    strategy_tracker = None
+    capital_allocator = None
+    strategy_evolution = None
+    engine_manager = None
+    try:
+        from hedgefund.engine.capital_allocator import CapitalAllocator
+        from hedgefund.engine.strategy_evolution import StrategyEvolutionEngine
+        from hedgefund.engine.strategy_tracker import StrategyPerformanceTracker
+        from hedgefund.engine.user_engine import UserEngineManager
+
+        strategy_tracker = StrategyPerformanceTracker(db=db)
+        capital_allocator = CapitalAllocator(db=db)
+        strategy_evolution = StrategyEvolutionEngine(
+            strategy_tracker=strategy_tracker,
+            capital_allocator=capital_allocator,
+            db=db,
+        )
+
+        session_mgr_ref = getattr(app.state, "session_manager", None)
+        engine_manager = UserEngineManager(
+            event_bus=dsm.event_bus,
+            broker_manager=app.state.broker_manager,
+            broker_router=app.state.broker_router,
+            session_manager=session_mgr_ref,
+            db=db,
+            capital_allocator=capital_allocator,
+            strategy_tracker=strategy_tracker,
+            execution_bridge=execution_bridge,
+        )
+
+        # Wire strategy tracker into execution bridge
+        if execution_bridge is not None:
+            execution_bridge._strategy_tracker = strategy_tracker
+
+        # Wire engine manager into signal runner for broadcasting
+        if signal_runner is not None:
+            signal_runner._engine_manager = engine_manager
+
+        await strategy_evolution.start()
+
+        app.state.strategy_tracker = strategy_tracker
+        app.state.capital_allocator = capital_allocator
+        app.state.strategy_evolution = strategy_evolution
+        app.state.engine_manager = engine_manager
+        log.info("l4_components.started")
+    except Exception:
+        log.warning("l4_components.start_failed", exc_info=True)
+
     yield
 
     # ── Shutdown ──────────────────────────────────────────────────────────
 
     log.info("dashboard_shutting_down")
 
-    # 0. Stop signal runner
+    # L4. Stop Level-4 components first
+    if strategy_evolution is not None:
+        await strategy_evolution.shutdown()
+    if engine_manager is not None:
+        await engine_manager.shutdown_all()
+
+    # 0. Stop execution bridge
+    if execution_bridge is not None:
+        await execution_bridge.shutdown()
+
+    # 0b. Stop signal runner
     if signal_runner is not None:
         await signal_runner.stop()
 
-    # 0a. Stop Zerodha feed
+    # 0c. Stop Zerodha feed
     if zerodha_feed is not None:
         await zerodha_feed.stop()
 
-    # 0b. Stop Twitter stream
+    # 0d. Stop Twitter stream
     if twitter_stream is not None:
         await twitter_stream.stop()
 
@@ -282,6 +366,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # Zerodha OAuth + postback (public — Kite redirect needs no auth)
     app.include_router(zerodha_oauth_router, prefix="/api")
+
+    # Execution (Level-3: signal → order pipeline)
+    app.include_router(execution_router, prefix="/api")
+
+    # Level-4 routes (engines, capital allocation, strategy evolution)
+    app.include_router(l4_router, prefix="/api")
 
     # Market data (Zerodha Kite live quotes + historical charts)
     app.include_router(market_data_router)

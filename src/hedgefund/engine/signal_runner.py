@@ -65,6 +65,8 @@ class SignalRunner:
         self._task: Optional[asyncio.Task[None]] = None
         self._signals_generated = 0
         self._last_regime = MarketRegime.MEAN_REVERTING
+        # Level-4: optional reference for broadcasting signals to user engines
+        self._engine_manager: Any = None
 
     async def start(self) -> None:
         if self._running:
@@ -216,8 +218,19 @@ class SignalRunner:
             }
             WriteGuard.validate_signal(doc)
             await self._db.signals.insert_one(doc)
+            # Level-4: broadcast signal to all active user engines
+            await self._broadcast_to_engines(doc)
         except Exception:
             log.debug("signal_runner.store_failed", exc_info=True)
+
+    async def _broadcast_to_engines(self, doc: Dict[str, Any]) -> None:
+        """Push a stored signal to all active user execution engines."""
+        if self._engine_manager is None:
+            return
+        try:
+            await self._engine_manager.broadcast_signal(doc)
+        except Exception:
+            log.debug("signal_runner.broadcast_failed", exc_info=True)
 
     @property
     def signals_generated(self) -> int:
