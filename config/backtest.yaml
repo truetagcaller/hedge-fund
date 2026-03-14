@@ -1,0 +1,26 @@
+# Backtesting configuration overrides
+app:
+  log_level: "INFO"
+  json_logs: false
+
+execution:
+  broker: "paper"
+  slippage_bps: 5
+
+risk:
+  initial_capital: 10000000.0
+  risk_per_trade_pct: 0.01
+  max_daily_loss_pct: 0.03
+  max_drawdown_pct: 0.10
+
+backtest:
+  initial_capital: 10000000.0
+  commission_per_contract: 0.65
+  slippage_bps: 5
+  walk_forward_train_days: 252
+  walk_forward_test_days: 63
+  monte_carlo_simulations: 10000
+  regime_aware: true
+
+learning:
+  enabled: true

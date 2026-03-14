@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HedgeFund AI - Data Source Status</title>
+<style>
+  :root {
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-tertiary: #21262d;
+    --border: #30363d;
+    --text-primary: #e6edf3;
+    --text-secondary: #8b949e;
+    --text-muted: #484f58;
+    --green: #3fb950;
+    --red: #f85149;
+    --blue: #58a6ff;
+    --orange: #d29922;
+    --purple: #bc8cff;
+    --yellow: #e3b341;
+    --cyan: #39d2c0;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 20px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .header-left h1 { font-size: 15px; font-weight: 700; white-space: nowrap; }
+  .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .header-btn {
+    padding: 5px 12px; border-radius: 6px; font-size: 11px; font-weight: 600;
+    font-family: inherit; cursor: pointer; border: 1px solid var(--border);
+    background: var(--bg-tertiary); color: var(--text-primary);
+    text-transform: uppercase; letter-spacing: 0.04em;
+    transition: background 0.15s, border-color 0.15s; white-space: nowrap;
+    text-decoration: none; display: inline-block;
+  }
+  .header-btn:hover { background: var(--border); border-color: var(--text-muted); }
+  #refresh-time { font-size: 11px; color: var(--text-secondary); white-space: nowrap; }
+
+  .container {
+    max-width: 900px;
+    margin: 24px auto;
+    padding: 0 20px;
+  }
+
+  .panel {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .panel-title {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .status-grid {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 10px 16px;
+    align-items: center;
+  }
+  .status-label {
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+  }
+  .status-value {
+    font-weight: 600;
+    font-size: 12px;
+  }
+  .status-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .badge-connected {
+    background: rgba(63, 185, 80, 0.15);
+    color: var(--green);
+  }
+  .badge-not-connected {
+    background: rgba(248, 81, 73, 0.15);
+    color: var(--red);
+  }
+  .badge-not-configured {
+    background: rgba(210, 153, 34, 0.15);
+    color: var(--orange);
+  }
+  .badge-stale {
+    background: rgba(210, 153, 34, 0.15);
+    color: var(--orange);
+  }
+  .badge-error {
+    background: rgba(248, 81, 73, 0.2);
+    color: var(--red);
+  }
+
+  .readiness-bar {
+    margin-top: 20px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    text-align: center;
+  }
+  .readiness-ready {
+    background: rgba(63, 185, 80, 0.12);
+    color: var(--green);
+    border: 1px solid rgba(63, 185, 80, 0.3);
+  }
+  .readiness-not-ready {
+    background: rgba(248, 81, 73, 0.1);
+    color: var(--red);
+    border: 1px solid rgba(248, 81, 73, 0.25);
+  }
+
+  .warnings-list {
+    margin-top: 16px;
+    list-style: none;
+  }
+  .warnings-list li {
+    padding: 6px 12px;
+    margin-bottom: 6px;
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--orange);
+    background: rgba(210, 153, 34, 0.08);
+    border-left: 3px solid var(--orange);
+  }
+
+  .agents-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .agents-table th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .agents-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-primary);
+  }
+  .agents-table tr:last-child td { border-bottom: none; }
+
+  .creds-list {
+    list-style: none;
+  }
+  .creds-list li {
+    padding: 8px 12px;
+    margin-bottom: 6px;
+    border-radius: 6px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+  }
+  .creds-list .cred-service {
+    font-weight: 700;
+    color: var(--blue);
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+  }
+  .creds-list .cred-desc {
+    color: var(--text-secondary);
+    font-size: 12px;
+    margin-top: 2px;
+  }
+
+  .empty-state {
+    color: var(--text-muted);
+    font-size: 12px;
+    text-align: center;
+    padding: 20px;
+  }
+  .spinner {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border: 2px solid var(--border);
+    border-top-color: var(--blue);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1>HEDGEFUND AI</h1>
+    <span style="color: var(--text-muted);">|</span>
+    <span style="color: var(--blue); font-weight: 600; font-size: 12px;">DATA SOURCE STATUS</span>
+  </div>
+  <div class="header-right">
+    <span id="refresh-time">--</span>
+    <a href="/" class="header-btn">Dashboard</a>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- Data Source Status Panel -->
+  <div class="panel">
+    <div class="panel-title">Data Source Status</div>
+    <div class="status-grid" id="status-grid">
+      <span class="status-label">Market Feed</span>
+      <span class="status-value" id="market-feed-status">
+        <span class="spinner"></span> Loading...
+      </span>
+
+      <span class="status-label">Broker</span>
+      <span class="status-value" id="broker-status">
+        <span class="spinner"></span> Loading...
+      </span>
+
+      <span class="status-label">News API</span>
+      <span class="status-value" id="news-api-status">
+        <span class="spinner"></span> Loading...
+      </span>
+
+      <span class="status-label">X API</span>
+      <span class="status-value" id="x-api-status">
+        <span class="spinner"></span> Loading...
+      </span>
+
+      <span class="status-label">Last Data</span>
+      <span class="status-value" id="last-data">--</span>
+    </div>
+
+    <div id="readiness-bar" class="readiness-bar readiness-not-ready" style="display:none;"></div>
+
+    <ul id="warnings-list" class="warnings-list"></ul>
+  </div>
+
+  <!-- Agent Status Panel -->
+  <div class="panel">
+    <div class="panel-title">AI Agent Status</div>
+    <div id="agents-container">
+      <div class="empty-state"><span class="spinner"></span> Loading agent status...</div>
+    </div>
+  </div>
+
+  <!-- Credentials Required Panel -->
+  <div class="panel">
+    <div class="panel-title">Credentials Required</div>
+    <div id="creds-container">
+      <div class="empty-state"><span class="spinner"></span> Checking credentials...</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const REFRESH_MS = 5000;
+
+  function badgeClass(status) {
+    const s = (status || "").toUpperCase();
+    if (s === "CONNECTED") return "badge-connected";
+    if (s === "NOT CONNECTED" || s === "DISCONNECTED") return "badge-not-connected";
+    if (s === "NOT CONFIGURED") return "badge-not-configured";
+    if (s === "STALE") return "badge-stale";
+    if (s === "ERROR") return "badge-error";
+    return "badge-not-configured";
+  }
+
+  function badge(status) {
+    return '<span class="status-badge ' + badgeClass(status) + '">' +
+      escapeHtml(status) + '</span>';
+  }
+
+  function escapeHtml(str) {
+    var d = document.createElement("div");
+    d.textContent = str || "";
+    return d.innerHTML;
+  }
+
+  function formatTime(iso) {
+    if (!iso) return "--";
+    try {
+      var d = new Date(iso);
+      return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    } catch (e) {
+      return iso;
+    }
+  }
+
+  // ── Data Source Status ──────────────────────────────────────────────
+
+  async function fetchDataSourceStatus() {
+    try {
+      var res = await fetch("/api/system/data-source-status");
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      var data = await res.json();
+
+      var mf = data.market_feed || {};
+      var br = data.broker || {};
+      var na = data.news_api || {};
+      var xs = data.x_sentiment || {};
+
+      document.getElementById("market-feed-status").innerHTML =
+        badge(mf.status || "NOT CONNECTED") +
+        (mf.source ? ' <span style="color:var(--text-muted);font-size:11px;">(' +
+          escapeHtml(mf.source) + ')</span>' : '');
+
+      document.getElementById("broker-status").innerHTML =
+        badge(br.status || "NOT CONNECTED") +
+        (br.name ? ' <span style="color:var(--text-muted);font-size:11px;">(' +
+          escapeHtml(br.name) + ')</span>' : '');
+
+      document.getElementById("news-api-status").innerHTML =
+        badge(na.status || "NOT CONFIGURED") +
+        (na.source ? ' <span style="color:var(--text-muted);font-size:11px;">(' +
+          escapeHtml(na.source) + ')</span>' : '');
+
+      document.getElementById("x-api-status").innerHTML =
+        badge(xs.status || "NOT CONFIGURED") +
+        (xs.source ? ' <span style="color:var(--text-muted);font-size:11px;">(' +
+          escapeHtml(xs.source) + ')</span>' : '');
+
+      // Last data timestamp
+      var lastTs = mf.last_timestamp || null;
+      document.getElementById("last-data").textContent = lastTs ? formatTime(lastTs) : "--";
+
+      // Trading readiness
+      var bar = document.getElementById("readiness-bar");
+      bar.style.display = "block";
+      if (data.is_trading_ready) {
+        bar.className = "readiness-bar readiness-ready";
+        bar.textContent = "Trading Ready";
+      } else {
+        bar.className = "readiness-bar readiness-not-ready";
+        bar.textContent = "Not Ready for Trading";
+      }
+
+      // Warnings
+      var wl = document.getElementById("warnings-list");
+      wl.innerHTML = "";
+      (data.warnings || []).forEach(function (w) {
+        var li = document.createElement("li");
+        li.textContent = w;
+        wl.appendChild(li);
+      });
+
+      // Update refresh time
+      document.getElementById("refresh-time").textContent =
+        "Last refresh: " + formatTime(data.checked_at || new Date().toISOString());
+
+    } catch (e) {
+      console.error("Failed to fetch data source status:", e);
+      document.getElementById("refresh-time").textContent = "Error fetching status";
+    }
+  }
+
+  // ── Agent Status ───────────────────────────────────────────────────
+
+  async function fetchAgentStatus() {
+    var container = document.getElementById("agents-container");
+    try {
+      var res = await fetch("/api/system/agent-status");
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      var data = await res.json();
+
+      // agents can be a dict (keyed by name) or an array
+      var agentsList = data.agents || {};
+      var entries = [];
+      if (Array.isArray(agentsList)) {
+        entries = agentsList;
+      } else {
+        for (var key in agentsList) {
+          if (agentsList.hasOwnProperty(key)) entries.push(agentsList[key]);
+        }
+      }
+
+      if (entries.length === 0) {
+        container.innerHTML = '<div class="empty-state">' +
+          escapeHtml(data.message || "No agents registered.") + '</div>';
+        return;
+      }
+
+      var totalAgents = data.total_agents || entries.length;
+      var activeAgents = data.active_agents || 0;
+      var summaryHtml = '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">' +
+        'Total: ' + totalAgents + ' agents | Active: ' + activeAgents +
+        (data.message ? ' | ' + escapeHtml(data.message) : '') + '</div>';
+
+      var html = summaryHtml + '<table class="agents-table"><thead><tr>' +
+        '<th>Agent</th><th>Active</th><th>Last Signal</th><th>Data Verified</th>' +
+        '</tr></thead><tbody>';
+
+      entries.forEach(function (a) {
+        var activeColor = a.active ? "var(--green)" : "var(--red)";
+        var verifiedColor = a.data_source_verified ? "var(--green)" : "var(--orange)";
+        html += '<tr>' +
+          '<td>' + escapeHtml(a.name) + '</td>' +
+          '<td style="color:' + activeColor + ';">' + (a.active ? "YES" : "NO") + '</td>' +
+          '<td>' + (a.last_data_timestamp ? formatTime(a.last_data_timestamp) : "--") + '</td>' +
+          '<td style="color:' + verifiedColor + ';">' +
+            (a.data_source_verified ? "YES" : "NO") + '</td>' +
+          '</tr>';
+      });
+
+      html += '</tbody></table>';
+      container.innerHTML = html;
+
+    } catch (e) {
+      console.error("Failed to fetch agent status:", e);
+      container.innerHTML = '<div class="empty-state">Unable to load agent status.</div>';
+    }
+  }
+
+  // ── Credentials Required ──────────────────────────────────────────
+
+  async function fetchCredentials() {
+    var container = document.getElementById("creds-container");
+    try {
+      var res = await fetch("/api/system/credentials-required");
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      var data = await res.json();
+
+      if (data.all_configured) {
+        container.innerHTML =
+          '<div class="empty-state" style="color:var(--green);">' +
+          'All credentials configured.</div>';
+        return;
+      }
+
+      var html = '<ul class="creds-list">';
+      (data.credentials_required || []).forEach(function (c) {
+        html += '<li>' +
+          '<div class="cred-service">' + escapeHtml(c.service) + '</div>' +
+          '<div class="cred-desc">' + escapeHtml(c.description) + '</div>' +
+          '</li>';
+      });
+      html += '</ul>';
+      container.innerHTML = html;
+
+    } catch (e) {
+      console.error("Failed to fetch credentials:", e);
+      container.innerHTML =
+        '<div class="empty-state">Unable to check credentials.</div>';
+    }
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────
+
+  function refreshAll() {
+    fetchDataSourceStatus();
+    fetchAgentStatus();
+    fetchCredentials();
+  }
+
+  refreshAll();
+  setInterval(refreshAll, REFRESH_MS);
+})();
+</script>
+</body>
+</html>

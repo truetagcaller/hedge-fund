@@ -1,0 +1,106 @@
+version: "3.9"
+
+services:
+  # ── Trading Application ──────────────────────────────────────────
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    command: ["run", "--tick-interval", "60"]
+    env_file:
+      - ../.env
+    environment:
+      HEDGEFUND_ENV: production
+      HEDGEFUND_REDIS__HOST: redis
+      HEDGEFUND_DATABASE__HOST: postgres
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - hedgefund
+    restart: unless-stopped
+    volumes:
+      - app-data:/app/data
+      - model-artifacts:/app/models
+
+  # ── Dashboard ────────────────────────────────────────────────────
+  dashboard:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    command: ["dashboard"]
+    ports:
+      - "${DASHBOARD_PORT:-8000}:8000"
+    env_file:
+      - ../.env
+    environment:
+      HEDGEFUND_ENV: production
+      HEDGEFUND_REDIS__HOST: redis
+      HEDGEFUND_DATABASE__HOST: postgres
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - hedgefund
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ── Redis ────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - hedgefund
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ── PostgreSQL ───────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-hedgefund}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    networks:
+      - hedgefund
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-hedgefund}"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+networks:
+  hedgefund:
+    driver: bridge
+
+volumes:
+  app-data:
+  model-artifacts:
+  redis-data:
+  pg-data:

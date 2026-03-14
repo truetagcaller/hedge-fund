@@ -1,0 +1,181 @@
+# Base configuration - shared across all environments
+app:
+  name: "HedgeFund AI Options Agent"
+  version: "1.0.0"
+  log_level: "INFO"
+  json_logs: false
+
+data:
+  cache_ttl_seconds: 30
+  stale_data_threshold_seconds: 60
+  symbols:
+    - "SPY"
+    - "QQQ"
+    - "IWM"
+    - "AAPL"
+    - "TSLA"
+    - "NVDA"
+    - "AMZN"
+    - "MSFT"
+  timeframes:
+    - "1m"
+    - "5m"
+    - "15m"
+    - "1h"
+    - "1d"
+  polygon:
+    base_url: "https://api.polygon.io"
+  yahoo:
+    enabled: true
+
+features:
+  ema_periods: [9, 21, 50, 200]
+  rsi_period: 14
+  macd_fast: 12
+  macd_slow: 26
+  macd_signal: 9
+  bollinger_period: 20
+  bollinger_std: 2.0
+  atr_period: 14
+  supertrend_period: 10
+  supertrend_multiplier: 3.0
+  volume_profile_bins: 50
+
+analysis:
+  regime_lookback_days: 60
+  vwap_deviation_threshold: 0.02
+  order_flow_large_trade_multiplier: 5.0
+  gex_enabled: true
+
+sentiment:
+  enabled: true
+  news_lookback_hours: 24
+  social_lookback_hours: 12
+  min_magnitude: 0.3
+  weights:
+    news: 0.5
+    social: 0.3
+    options_flow: 0.2
+
+signals:
+  min_confidence: 0.65
+  min_risk_reward: 2.0
+  ensemble_weights:
+    ml_signal: 0.4
+    rl_signal: 0.3
+    rule_signal: 0.3
+  cooldown_minutes: 15
+
+risk:
+  initial_capital: 10000000.0  # $10M
+  risk_per_trade_pct: 0.01     # 1%
+  max_daily_loss_pct: 0.05     # 5%
+  max_drawdown_pct: 0.10       # 10%
+  max_concurrent_positions: 20
+  max_single_position_pct: 0.05  # 5% of portfolio
+  max_sector_exposure_pct: 0.25  # 25%
+  max_delta_exposure: 500
+  max_gamma_exposure: 100
+  max_vega_exposure: 50000
+  position_sizing_method: "volatility_adjusted"  # fixed_fraction | kelly | volatility_adjusted
+  kelly_fraction: 0.25  # quarter-kelly for safety
+  atr_stop_multiplier: 2.0
+  trailing_stop_enabled: true
+  trailing_stop_atr_multiplier: 1.5
+
+execution:
+  broker: "paper"  # paper | alpaca | ibkr
+  slippage_bps: 5
+  max_spread_pct: 0.05  # skip options with >5% bid-ask spread
+  order_timeout_seconds: 30
+  retry_attempts: 3
+  min_volume: 100
+  min_open_interest: 500
+
+learning:
+  enabled: true
+  retrain_interval_hours: 168  # weekly
+  lstm:
+    hidden_size: 128
+    num_layers: 3
+    dropout: 0.2
+    sequence_length: 60
+    learning_rate: 0.001
+    epochs: 100
+    batch_size: 64
+  transformer:
+    d_model: 256
+    nhead: 8
+    num_layers: 4
+    dropout: 0.1
+    learning_rate: 0.0001
+  rl:
+    algorithm: "PPO"
+    learning_rate: 0.0003
+    gamma: 0.99
+    n_steps: 2048
+    batch_size: 64
+    total_timesteps: 1000000
+  random_forest:
+    n_estimators: 500
+    max_depth: 10
+    min_samples_split: 20
+
+backtest:
+  initial_capital: 10000000.0
+  commission_per_contract: 0.65
+  slippage_bps: 5
+  walk_forward_train_days: 252
+  walk_forward_test_days: 63
+  monte_carlo_simulations: 10000
+  regime_aware: true
+
+dashboard:
+  host: "0.0.0.0"
+  port: 8000
+  ws_heartbeat_seconds: 15
+
+redis:
+  host: "localhost"
+  port: 6379
+  db: 0
+
+database:
+  host: "localhost"
+  port: 5432
+  name: "hedgefund"
+  pool_size: 10
+
+agents:
+  enabled: true
+  weights:
+    trend_following: 0.15
+    mean_reversion: 0.15
+    options_volatility: 0.15
+    gamma_scalping: 0.10
+    news_reaction: 0.15
+    social_sentiment: 0.10
+    liquidity_sweep: 0.10
+    smart_money_flow: 0.10
+  min_active_agents: 2
+  signal_timeout_seconds: 300
+  require_live_data: true
+
+portfolio_optimizer:
+  method: risk_parity
+  rebalance_interval_hours: 24
+  min_history_days: 30
+
+data_source:
+  require_verified_source: true
+  stale_threshold_seconds: 60
+  allowed_sources:
+    - zerodha
+    - binance
+    - groww
+    - indmoney
+    - polygon
+    - yahoo
+    - news_api
+    - twitter
+    - reuters

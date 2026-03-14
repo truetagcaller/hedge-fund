@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HedgeFund AI - Login</title>
+<style>
+  :root {
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-tertiary: #21262d;
+    --border: #30363d;
+    --text-primary: #e6edf3;
+    --text-secondary: #8b949e;
+    --text-muted: #484f58;
+    --green: #3fb950;
+    --red: #f85149;
+    --blue: #58a6ff;
+    --orange: #d29922;
+    --purple: #bc8cff;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 13px;
+    line-height: 1.5;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .auth-container {
+    width: 420px;
+    max-width: 95vw;
+  }
+  .auth-logo {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .auth-logo h1 {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .auth-logo h1 span {
+    color: var(--blue);
+  }
+  .auth-logo p {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 6px;
+  }
+  .auth-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 32px;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.3);
+  }
+  .auth-card-title {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 24px;
+    text-align: center;
+  }
+  .form-group {
+    margin-bottom: 16px;
+  }
+  .form-group label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+  }
+  .form-group input {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .form-group input:focus {
+    border-color: var(--blue);
+  }
+  .form-group input::placeholder {
+    color: var(--text-muted);
+  }
+  .form-group .field-error {
+    font-size: 11px;
+    color: var(--red);
+    margin-top: 4px;
+    display: none;
+  }
+  .form-group.has-error input {
+    border-color: var(--red);
+  }
+  .form-group.has-error .field-error {
+    display: block;
+  }
+  .btn-auth {
+    width: 100%;
+    padding: 12px 20px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    background: var(--blue);
+    color: #ffffff;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    transition: opacity 0.15s;
+    margin-top: 8px;
+  }
+  .btn-auth:hover {
+    opacity: 0.85;
+  }
+  .btn-auth:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .auth-message {
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    margin-bottom: 16px;
+    display: none;
+  }
+  .auth-message.error {
+    display: block;
+    background: rgba(248,81,73,0.1);
+    border: 1px solid rgba(248,81,73,0.3);
+    color: var(--red);
+  }
+  .auth-message.success {
+    display: block;
+    background: rgba(63,185,80,0.1);
+    border: 1px solid rgba(63,185,80,0.3);
+    color: var(--green);
+  }
+  .auth-footer {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .auth-footer a {
+    color: var(--blue);
+    text-decoration: none;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .auth-footer a:hover {
+    text-decoration: underline;
+  }
+  .auth-panel {
+    display: none;
+  }
+  .auth-panel.active {
+    display: block;
+  }
+  .auth-bottom-text {
+    text-align: center;
+    margin-top: 24px;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+</style>
+</head>
+<body>
+
+<div class="auth-container">
+  <div class="auth-logo">
+    <h1>Hedge<span>Fund</span> AI</h1>
+    <p>Algorithmic Trading Platform</p>
+  </div>
+
+  <!-- Login Panel -->
+  <div class="auth-panel active" id="login-panel">
+    <div class="auth-card">
+      <div class="auth-card-title">Sign In</div>
+      <div class="auth-message" id="login-message"></div>
+      <form id="login-form" onsubmit="return handleLogin(event)">
+        <div class="form-group" id="login-email-group">
+          <label for="login-email">Email</label>
+          <input type="email" id="login-email" placeholder="you@example.com" autocomplete="email" required>
+          <div class="field-error" id="login-email-error">Please enter a valid email address.</div>
+        </div>
+        <div class="form-group" id="login-password-group">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" placeholder="Enter your password" autocomplete="current-password" required>
+          <div class="field-error" id="login-password-error">Password is required.</div>
+        </div>
+        <button type="submit" class="btn-auth" id="login-btn">Login</button>
+      </form>
+      <div class="auth-footer">
+        Don't have an account? <a onclick="showPanel('register')">Register</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Register Panel -->
+  <div class="auth-panel" id="register-panel">
+    <div class="auth-card">
+      <div class="auth-card-title">Create Account</div>
+      <div class="auth-message" id="register-message"></div>
+      <form id="register-form" onsubmit="return handleRegister(event)">
+        <div class="form-group" id="register-email-group">
+          <label for="register-email">Email</label>
+          <input type="email" id="register-email" placeholder="you@example.com" autocomplete="email" required>
+          <div class="field-error" id="register-email-error">Please enter a valid email address.</div>
+        </div>
+        <div class="form-group" id="register-username-group">
+          <label for="register-username">Username</label>
+          <input type="text" id="register-username" placeholder="Choose a username" autocomplete="username" required>
+          <div class="field-error" id="register-username-error">Username is required.</div>
+        </div>
+        <div class="form-group" id="register-password-group">
+          <label for="register-password">Password</label>
+          <input type="password" id="register-password" placeholder="Min 8 characters" autocomplete="new-password" required>
+          <div class="field-error" id="register-password-error">Password must be at least 8 characters.</div>
+        </div>
+        <div class="form-group" id="register-confirm-group">
+          <label for="register-confirm">Confirm Password</label>
+          <input type="password" id="register-confirm" placeholder="Confirm your password" autocomplete="new-password" required>
+          <div class="field-error" id="register-confirm-error">Passwords do not match.</div>
+        </div>
+        <button type="submit" class="btn-auth" id="register-btn">Register</button>
+      </form>
+      <div class="auth-footer">
+        Already have an account? <a onclick="showPanel('login')">Login</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="auth-bottom-text">
+    Secured trading environment &middot; End-to-end encrypted
+  </div>
+</div>
+
+<script>
+(function() {
+  "use strict";
+
+  // If already logged in, redirect to dashboard
+  var token = localStorage.getItem("hf_access_token");
+  if (token) {
+    fetch("/api/auth/me", {
+      headers: { "Authorization": "Bearer " + token }
+    }).then(function(r) {
+      if (r.ok) { location.href = "/"; }
+    }).catch(function() {});
+  }
+
+  // Panel switching
+  window.showPanel = function(panel) {
+    var panels = document.querySelectorAll(".auth-panel");
+    for (var i = 0; i < panels.length; i++) {
+      panels[i].classList.remove("active");
+    }
+    document.getElementById(panel + "-panel").classList.add("active");
+    // Clear messages
+    clearMessages();
+    clearErrors();
+  };
+
+  function clearMessages() {
+    var msgs = document.querySelectorAll(".auth-message");
+    for (var i = 0; i < msgs.length; i++) {
+      msgs[i].className = "auth-message";
+      msgs[i].textContent = "";
+    }
+  }
+
+  function clearErrors() {
+    var groups = document.querySelectorAll(".form-group");
+    for (var i = 0; i < groups.length; i++) {
+      groups[i].classList.remove("has-error");
+    }
+  }
+
+  function showMessage(elementId, text, type) {
+    var el = document.getElementById(elementId);
+    el.className = "auth-message " + type;
+    el.textContent = text;
+  }
+
+  function setFieldError(groupId, show) {
+    var group = document.getElementById(groupId);
+    if (show) { group.classList.add("has-error"); }
+    else { group.classList.remove("has-error"); }
+  }
+
+  function isValidEmail(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+
+  // Login handler
+  window.handleLogin = function(e) {
+    e.preventDefault();
+    clearErrors();
+    clearMessages();
+
+    var email = document.getElementById("login-email").value.trim();
+    var password = document.getElementById("login-password").value;
+    var valid = true;
+
+    if (!email || !isValidEmail(email)) {
+      setFieldError("login-email-group", true);
+      valid = false;
+    }
+    if (!password) {
+      setFieldError("login-password-group", true);
+      valid = false;
+    }
+    if (!valid) return false;
+
+    var btn = document.getElementById("login-btn");
+    btn.disabled = true;
+    btn.textContent = "Signing in...";
+
+    fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email, password: password })
+    }).then(function(r) {
+      if (!r.ok) {
+        return r.json().then(function(d) {
+          throw new Error(d.detail || d.message || "Login failed");
+        });
+      }
+      return r.json();
+    }).then(function(data) {
+      var accessToken = data.access_token || data.token;
+      if (!accessToken) { throw new Error("No token received"); }
+      localStorage.setItem("hf_access_token", accessToken);
+      document.cookie = "hf_access_token=" + encodeURIComponent(accessToken) + ";path=/;SameSite=Lax";
+      location.href = "/";
+    }).catch(function(err) {
+      showMessage("login-message", err.message, "error");
+      btn.disabled = false;
+      btn.textContent = "Login";
+    });
+
+    return false;
+  };
+
+  // Register handler
+  window.handleRegister = function(e) {
+    e.preventDefault();
+    clearErrors();
+    clearMessages();
+
+    var email = document.getElementById("register-email").value.trim();
+    var username = document.getElementById("register-username").value.trim();
+    var password = document.getElementById("register-password").value;
+    var confirm = document.getElementById("register-confirm").value;
+    var valid = true;
+
+    if (!email || !isValidEmail(email)) {
+      setFieldError("register-email-group", true);
+      valid = false;
+    }
+    if (!username) {
+      setFieldError("register-username-group", true);
+      valid = false;
+    }
+    if (!password || password.length < 8) {
+      setFieldError("register-password-group", true);
+      valid = false;
+    }
+    if (password !== confirm) {
+      setFieldError("register-confirm-group", true);
+      valid = false;
+    }
+    if (!valid) return false;
+
+    var btn = document.getElementById("register-btn");
+    btn.disabled = true;
+    btn.textContent = "Creating account...";
+
+    fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email, username: username, password: password })
+    }).then(function(r) {
+      if (!r.ok) {
+        return r.json().then(function(d) {
+          throw new Error(d.detail || d.message || "Registration failed");
+        });
+      }
+      return r.json();
+    }).then(function() {
+      showMessage("register-message", "Account created successfully! You can now login.", "success");
+      btn.disabled = false;
+      btn.textContent = "Register";
+      // Switch to login after short delay
+      setTimeout(function() {
+        showPanel("login");
+        showMessage("login-message", "Account created! Please sign in.", "success");
+        document.getElementById("login-email").value = email;
+      }, 1500);
+    }).catch(function(err) {
+      showMessage("register-message", err.message, "error");
+      btn.disabled = false;
+      btn.textContent = "Register";
+    });
+
+    return false;
+  };
+
+})();
+</script>
+</body>
+</html>

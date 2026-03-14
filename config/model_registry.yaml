@@ -1,0 +1,59 @@
+# Model Registry - tracks ML model versions and artifacts
+models:
+  lstm_price:
+    name: "LSTM Price Predictor"
+    version: "0.1.0"
+    status: "staging"  # staging | production | deprecated
+    artifact_path: "models/lstm_price/"
+    training_date: null
+    metrics:
+      rmse: null
+      mae: null
+      directional_accuracy: null
+    config_hash: null
+
+  transformer_forecast:
+    name: "Temporal Fusion Transformer"
+    version: "0.1.0"
+    status: "staging"
+    artifact_path: "models/transformer/"
+    training_date: null
+    metrics:
+      rmse: null
+      mae: null
+    config_hash: null
+
+  rl_agent:
+    name: "PPO Trading Agent"
+    version: "0.1.0"
+    status: "staging"
+    artifact_path: "models/rl_agent/"
+    training_date: null
+    metrics:
+      mean_reward: null
+      sharpe: null
+      max_drawdown: null
+    config_hash: null
+
+  signal_classifier:
+    name: "Random Forest Signal Classifier"
+    version: "0.1.0"
+    status: "staging"
+    artifact_path: "models/signal_classifier/"
+    training_date: null
+    metrics:
+      accuracy: null
+      precision: null
+      recall: null
+      f1: null
+    config_hash: null
+
+  sentiment_model:
+    name: "FinBERT Sentiment"
+    version: "0.1.0"
+    status: "production"
+    artifact_path: "models/sentiment/"
+    training_date: null
+    metrics:
+      accuracy: null
+    config_hash: null

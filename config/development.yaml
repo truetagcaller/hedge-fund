@@ -1,0 +1,25 @@
+# Development environment overrides
+app:
+  log_level: "DEBUG"
+  json_logs: false
+
+data:
+  cache_ttl_seconds: 60
+  stale_data_threshold_seconds: 300
+
+execution:
+  broker: "paper"
+  slippage_bps: 10
+
+risk:
+  initial_capital: 1000000.0  # $1M for dev
+  risk_per_trade_pct: 0.02
+  max_daily_loss_pct: 0.05
+  max_concurrent_positions: 10
+
+learning:
+  enabled: false
+
+dashboard:
+  host: "127.0.0.1"
+  port: 8000

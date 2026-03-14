@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Environment
+.env
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Credentials & secrets (NEVER commit)
+~/.hedgefund/
+credentials.enc
+credentials.json
+.master_key
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+/tmp/
+
+# Coverage
+htmlcov/
+.coverage
+coverage.xml
+
+# Data
+*.csv
+*.parquet
+data_sources.json

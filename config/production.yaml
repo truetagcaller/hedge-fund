@@ -1,0 +1,35 @@
+# Production environment overrides
+app:
+  log_level: "WARNING"
+  json_logs: true
+
+data:
+  cache_ttl_seconds: 15
+  stale_data_threshold_seconds: 30
+
+execution:
+  broker: "ibkr"  # or "alpaca"
+  slippage_bps: 3
+  max_spread_pct: 0.03
+
+risk:
+  risk_per_trade_pct: 0.008  # Tighter in production
+  max_daily_loss_pct: 0.025
+  max_concurrent_positions: 15
+
+learning:
+  retrain_interval_hours: 72
+
+dashboard:
+  host: "0.0.0.0"
+  port: 8000
+
+redis:
+  host: "redis"
+  port: 6379
+
+database:
+  host: "timescaledb"
+  port: 5432
+  name: "hedgefund"
+  pool_size: 20
