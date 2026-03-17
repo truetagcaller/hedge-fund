@@ -1,7 +1,6 @@
 """Tests for signal generation."""
 
 import pytest
-import pandas as pd
 import numpy as np
 
 from hedgefund.types import MarketRegime, SentimentResult, SignalAction

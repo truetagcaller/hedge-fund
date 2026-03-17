@@ -3,7 +3,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from datetime import datetime, date, timedelta, timezone
+from datetime import datetime, date, timezone
 
 from hedgefund.types import (
     OptionContract,
@@ -13,11 +13,6 @@ from hedgefund.types import (
     TradeSignal,
     SignalAction,
     SignalDirection,
-    MarketRegime,
-    Order,
-    OrderType,
-    OrderStatus,
-    Side,
     Position,
     PortfolioSnapshot,
     SentimentResult,

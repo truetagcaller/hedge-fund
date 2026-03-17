@@ -1,6 +1,5 @@
 """Tests for position sizing algorithms."""
 
-import pytest
 from hedgefund.risk.position_sizer import PositionSizer
 
 
