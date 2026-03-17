@@ -14,14 +14,14 @@ from __future__ import annotations
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, Optional
 
 import structlog
 
 from hedgefund.streaming.event_bus import Event, EventBus, EventType
-from hedgefund.types import SignalAction, SignalDirection
+from hedgefund.types import SignalDirection
 
 log = structlog.get_logger(__name__)
 
@@ -431,7 +431,7 @@ class TradingDecisionEngine:
 
         decision = TradeDecision(
             decision_id=TradeDecision.generate_id(),
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             symbol=symbol,
             action=action,
             entry_price=round(price, 4),

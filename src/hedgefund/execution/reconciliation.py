@@ -8,8 +8,8 @@ seconds) to keep the local book in sync.
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass, field
-from datetime import datetime
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Optional, Sequence
 
 import structlog
@@ -102,7 +102,7 @@ class ReconciliationEngine:
         Fetches broker state, diffs against local books, and returns
         all detected changes.
         """
-        ts = datetime.utcnow()
+        ts = datetime.now(timezone.utc)
         broker_portfolio = await self._broker.get_portfolio()
         broker_positions = await self._broker.get_positions()
 

@@ -7,14 +7,13 @@ Uses :pypi:`asyncpg` for raw performance where needed and :pypi:`SQLAlchemy`
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional
 
 import asyncpg
 import sqlalchemy as sa
 from sqlalchemy import (
     JSON,
     BigInteger,
-    Boolean,
     Column,
     DateTime,
     Float,

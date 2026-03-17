@@ -6,7 +6,7 @@ import abc
 from dataclasses import dataclass
 from typing import Optional
 
-from hedgefund.types import Order, PortfolioSnapshot, TradeSignal
+from hedgefund.types import PortfolioSnapshot, TradeSignal
 
 
 @dataclass(frozen=True, slots=True)

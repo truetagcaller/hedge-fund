@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import time
 from dataclasses import dataclass, field
-from typing import Dict, Optional
+from typing import Dict
 
 from hedgefund.logger import get_logger
 

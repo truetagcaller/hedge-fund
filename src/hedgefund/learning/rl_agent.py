@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -88,7 +88,9 @@ class OptionsTradingEnv(gym.Env):
         super().__init__()
         self.cfg = config or TradingEnvConfig()
         self._data = np.asarray(data, dtype=np.float32)
-        assert self._data.ndim == 2, "data must be (T, obs_size)"
+        if self._data.ndim != 2:
+
+            raise RuntimeError("data must be (T, obs_size)")
 
         self.action_space = spaces.Discrete(len(ACTION_MAP))
         self.observation_space = spaces.Box(

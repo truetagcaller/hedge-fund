@@ -12,9 +12,8 @@ from __future__ import annotations
 
 import base64
 import io
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 import matplotlib
 matplotlib.use("Agg")  # Non-interactive backend; must precede pyplot import.
@@ -161,7 +160,7 @@ class BacktestReport:
         Returns:
             Path to generated HTML file.
         """
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         report_name = f"backtest_{timestamp}"
         report_dir = self.output_dir / report_name
         report_dir.mkdir(parents=True, exist_ok=True)
@@ -213,7 +212,7 @@ class BacktestReport:
 
         html = REPORT_TEMPLATE.format(
             title=title,
-            generated_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
             start_date=equity_curve.index[0].strftime("%Y-%m-%d") if len(equity_curve) > 0 else "N/A",
             end_date=equity_curve.index[-1].strftime("%Y-%m-%d") if len(equity_curve) > 0 else "N/A",
             total_return=pct(metrics.total_return),
@@ -587,7 +586,7 @@ class SelfContainedReport:
         template = Template(_JINJA_TEMPLATE)
         html = template.render(
             title=self.title,
-            generated_at=datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"),
+            generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
             n_bars=len(eq),
             date_range=date_range,
             metric_cards=metric_cards,

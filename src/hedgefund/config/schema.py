@@ -6,7 +6,7 @@ sensible defaults so the system can boot with *zero* user-supplied config.
 
 from __future__ import annotations
 
-from typing import Dict, List, Literal
+from typing import List, Literal
 
 from pydantic import BaseModel, Field
 
@@ -193,7 +193,7 @@ class BacktestConfig(BaseModel):
 
 
 class DashboardConfig(BaseModel):
-    host: str = "0.0.0.0"
+    host: str = "0.0.0.0"  # noqa: S104
     port: int = Field(8000, ge=1, le=65535)
     ws_heartbeat_seconds: int = 15
 

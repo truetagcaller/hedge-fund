@@ -21,7 +21,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 import httpx
@@ -37,11 +37,8 @@ from hedgefund.types import (
     OptionContract,
     OptionType,
     Order,
-    OrderStatus,
-    OrderType,
     PortfolioSnapshot,
     Position,
-    Side,
 )
 
 logger = get_logger(__name__)
@@ -258,7 +255,7 @@ class IndMoneyBroker(Broker):
                             underlying=symbol,
                             option_type=OptionType.CALL,
                             strike=0,
-                            expiration=date.today(),
+                            expiration=datetime.now(timezone.utc).date(),
                             multiplier=1,
                         ),
                         quantity=qty,
@@ -298,7 +295,7 @@ class IndMoneyBroker(Broker):
                             underlying=name,
                             option_type=OptionType.CALL,
                             strike=0,
-                            expiration=date.today(),
+                            expiration=datetime.now(timezone.utc).date(),
                             multiplier=1,
                         ),
                         quantity=max(1, int(units)),
@@ -337,7 +334,7 @@ class IndMoneyBroker(Broker):
                             underlying=symbol,
                             option_type=OptionType.CALL,
                             strike=0,
-                            expiration=date.today(),
+                            expiration=datetime.now(timezone.utc).date(),
                             multiplier=1,
                         ),
                         quantity=qty,
@@ -367,7 +364,7 @@ class IndMoneyBroker(Broker):
         total_pnl = sum(p.unrealized_pnl for p in positions)
 
         return PortfolioSnapshot(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             cash=0.0,
             net_liquidation=total_value,
             positions=positions,

@@ -116,8 +116,8 @@ async def setup_free_news_sources(request: Request) -> Dict[str, Any]:
     try:
         for src in dsm.list_sources():
             existing_names.add(src.get("name", ""))
-    except Exception:
-        pass
+    except Exception:  # noqa: S110
+            log.debug("unexpected_error", exc_info=True)
 
     # Add RSS feeds
     for feed in FREE_RSS_FEEDS:
@@ -281,8 +281,8 @@ async def get_x_sentiment_feed(request: Request, limit: int = 50) -> Dict[str, A
                         ),
                         "source": "twitter",
                     })
-        except Exception:
-            pass
+        except Exception:  # noqa: S110
+                log.debug("unexpected_error", exc_info=True)
 
     # Also check MongoDB for webhook-delivered tweets
     db = getattr(request.app.state, "db", None)
@@ -304,8 +304,8 @@ async def get_x_sentiment_feed(request: Request, limit: int = 50) -> Dict[str, A
                     ),
                     "source": "twitter",
                 })
-        except Exception:
-            pass
+        except Exception:  # noqa: S110
+                log.debug("unexpected_error", exc_info=True)
 
     return {"social": social_items, "total": len(social_items)}
 
@@ -362,8 +362,8 @@ async def get_sentiment_summary(request: Request) -> Dict[str, Any]:
                         "mentions": t.get("mentions", 0),
                         "sentiment": t.get("sentiment", 0.0),
                     })
-        except Exception:
-            pass
+        except Exception:  # noqa: S110
+                log.debug("unexpected_error", exc_info=True)
 
     return {
         "heatmap": heatmap,

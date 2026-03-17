@@ -7,8 +7,6 @@ interface for portfolio aggregation, credential storage, and health monitoring.
 from __future__ import annotations
 
 import asyncio
-import json
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -19,7 +17,7 @@ from hedgefund.logger import get_logger
 from hedgefund.security.api_permissions import validate_broker_permissions
 from hedgefund.security.credential_store import CredentialStore
 from hedgefund.security.sanitizer import Sanitizer
-from hedgefund.types import Greeks, PortfolioSnapshot, Position
+from hedgefund.types import PortfolioSnapshot, Position
 
 log = get_logger(__name__)
 _sanitizer = Sanitizer()

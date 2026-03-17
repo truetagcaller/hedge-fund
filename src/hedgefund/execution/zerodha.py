@@ -19,8 +19,8 @@ from __future__ import annotations
 import asyncio
 import hashlib
 from collections.abc import AsyncIterator
-from dataclasses import dataclass, field
-from datetime import date, datetime
+from dataclasses import dataclass
+from datetime import date, datetime, timezone
 from typing import Any, Optional
 
 import httpx
@@ -399,7 +399,7 @@ class ZerodhaBroker(Broker):
                 underlying="UNKNOWN",
                 option_type=OptionType.CALL,
                 strike=0,
-                expiration=date.today(),
+                expiration=datetime.now(timezone.utc).date(),
             ),
             side=Side.BUY,
             order_type=OrderType.MARKET,
@@ -430,7 +430,7 @@ class ZerodhaBroker(Broker):
                     underlying=p.get("tradingsymbol", "UNKNOWN"),
                     option_type=OptionType.CALL,
                     strike=0,
-                    expiration=date.today(),
+                    expiration=datetime.now(timezone.utc).date(),
                     multiplier=1,
                 )
 
@@ -469,7 +469,7 @@ class ZerodhaBroker(Broker):
         total_vega = sum(p.greeks.vega * p.quantity for p in positions)
 
         return PortfolioSnapshot(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             cash=cash,
             net_liquidation=net_liquidation,
             positions=positions,
@@ -528,7 +528,7 @@ class ZerodhaBroker(Broker):
                 underlying=o.get("tradingsymbol", "UNKNOWN"),
                 option_type=OptionType.CALL,
                 strike=0,
-                expiration=date.today(),
+                expiration=datetime.now(timezone.utc).date(),
                 multiplier=1,
             )
 

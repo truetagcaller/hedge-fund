@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import structlog
@@ -217,7 +217,7 @@ class SignalFusionEngine:
         fused = FusedSignal(
             fusion_id=FusedSignal.generate_id(),
             symbol=symbol,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             action=action,
             direction=direction,
             confidence=round(fused_confidence, 4),

@@ -17,7 +17,6 @@ import asyncio
 import enum
 import signal
 import time
-from datetime import datetime
 from typing import Any, Dict, Optional
 
 import structlog
@@ -27,12 +26,10 @@ from hedgefund.dashboard.server import create_app
 from hedgefund.dashboard.websocket.live_feed import ConnectionManager
 from hedgefund.exceptions import (
     CircuitBreakerTrippedError,
-    DataError,
     ExecutionError,
-    HedgeFundError,
     RiskError,
 )
-from hedgefund.types import PortfolioSnapshot, TradeSignal
+from hedgefund.types import PortfolioSnapshot
 
 log = structlog.get_logger(__name__)
 
@@ -819,15 +816,15 @@ class TradingApplication:
         if self._portfolio_manager is not None:
             try:
                 trade_stats = self._portfolio_manager.get_trade_statistics().to_dict()
-            except Exception:
-                pass
+            except Exception:  # noqa: S110
+                    log.debug("unexpected_error", exc_info=True)
 
         open_trades = 0
         if self._trade_executor is not None:
             try:
                 open_trades = len(self._trade_executor.get_open_trades())
-            except Exception:
-                pass
+            except Exception:  # noqa: S110
+                    log.debug("unexpected_error", exc_info=True)
 
         # Data source status
         data_source_status = {}

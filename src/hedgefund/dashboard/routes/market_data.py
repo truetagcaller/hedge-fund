@@ -11,9 +11,8 @@ from __future__ import annotations
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 
-from hedgefund.auth.middleware import get_current_user_optional
 
 log = structlog.get_logger(__name__)
 
@@ -42,8 +41,8 @@ async def _get_active_broker_type(request: Request) -> str:
                 bt = _type_from_id(bid)
                 if bt:
                     return bt
-        except Exception:
-            pass
+        except Exception:  # noqa: S110
+                log.debug("unexpected_error", exc_info=True)
 
     # 2. Fall back to MongoDB
     db = getattr(request.app.state, "db", None)
@@ -55,8 +54,8 @@ async def _get_active_broker_type(request: Request) -> str:
                 bt = _type_from_id(broker_id)
                 if bt:
                     return bt
-        except Exception:
-            pass
+        except Exception:  # noqa: S110
+                log.debug("unexpected_error", exc_info=True)
     return ""
 
 

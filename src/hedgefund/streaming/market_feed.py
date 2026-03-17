@@ -10,8 +10,8 @@ from __future__ import annotations
 import asyncio
 import enum
 import time
-from dataclasses import dataclass, field
-from datetime import datetime
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
 
 from hedgefund.logger import get_logger
@@ -215,7 +215,7 @@ class MarketFeedManager:
             await self._event_bus.publish(
                 Event(
                     event_type=EventType.TICK,
-                    timestamp=datetime.utcnow(),
+                    timestamp=datetime.now(timezone.utc),
                     symbol=entry.symbol,
                     data=data,
                     source="market_feed",
@@ -227,7 +227,7 @@ class MarketFeedManager:
             await self._event_bus.publish(
                 Event(
                     event_type=EventType.ORDERBOOK,
-                    timestamp=datetime.utcnow(),
+                    timestamp=datetime.now(timezone.utc),
                     symbol=entry.symbol,
                     data=data,
                     source="market_feed",
@@ -238,7 +238,7 @@ class MarketFeedManager:
             await self._event_bus.publish(
                 Event(
                     event_type=EventType.OPTIONS_CHAIN,
-                    timestamp=datetime.utcnow(),
+                    timestamp=datetime.now(timezone.utc),
                     symbol=entry.symbol,
                     data=data,
                     source="market_feed",

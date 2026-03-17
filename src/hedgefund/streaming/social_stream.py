@@ -9,7 +9,6 @@ event bus.
 from __future__ import annotations
 
 import asyncio
-import math
 import re
 import statistics
 import uuid
@@ -17,7 +16,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import httpx
 import structlog
@@ -44,9 +43,9 @@ _DEFAULT_HASHTAGS = [
 
 
 class AuthMethod(str, Enum):
-    BEARER_TOKEN = "bearer_token"
+    BEARER_TOKEN = "bearer_token"  # noqa: S105
     OAUTH2_USER = "oauth2_user"
-    SESSION_TOKEN = "session_token"
+    SESSION_TOKEN = "session_token"  # noqa: S105
 
 
 class AccountStatus(str, Enum):

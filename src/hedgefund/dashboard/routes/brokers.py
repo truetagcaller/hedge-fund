@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from hedgefund.auth.middleware import get_current_user
-from hedgefund.auth.models import encrypt_credentials, decrypt_credentials
+from hedgefund.auth.models import encrypt_credentials
 from hedgefund.execution.broker_manager import BrokerManager, SUPPORTED_BROKERS
 
 log = structlog.get_logger(__name__)

@@ -39,7 +39,7 @@ _pending_states: Dict[str, Dict[str, str]] = {}
 
 # Twitter OAuth 2.0 endpoints
 _TWITTER_AUTHORIZE_URL = "https://twitter.com/i/oauth2/authorize"
-_TWITTER_TOKEN_URL = "https://api.twitter.com/2/oauth2/token"
+_TWITTER_TOKEN_URL = "https://api.twitter.com/2/oauth2/token"  # noqa: S105
 _TWITTER_USER_URL = "https://api.twitter.com/2/users/me"
 
 
@@ -63,8 +63,8 @@ def _get_twitter_config(request: Request) -> Dict[str, str]:
                 client_id = stored_id
             if stored_secret:
                 client_secret = stored_secret
-        except Exception:
-            pass
+        except Exception:  # noqa: S110
+                log.debug("unexpected_error", exc_info=True)
 
     return {
         "client_id": client_id,

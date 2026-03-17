@@ -14,7 +14,6 @@ import pandas as pd
 import structlog
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
 from hedgefund.learning.base import TradingModel
@@ -185,11 +184,15 @@ class _TFTPreprocessor:
         self._stds[self._stds < 1e-8] = 1.0
 
     def transform(self, data: np.ndarray) -> np.ndarray:
-        assert self._means is not None
+        if self._means is None:
+
+            raise RuntimeError("_means is not None not initialized; call the appropriate setup method first.")
         return (data - self._means) / self._stds
 
     def inverse_transform_target(self, data: np.ndarray, col: int = 0) -> np.ndarray:
-        assert self._means is not None
+        if self._means is None:
+
+            raise RuntimeError("_means is not None not initialized; call the appropriate setup method first.")
         return data * self._stds[col] + self._means[col]
 
     def create_sequences(
@@ -344,8 +347,9 @@ class TemporalFusionTransformer(TradingModel):
     def predict_quantiles(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
         """Return quantile predictions of shape (N, horizon, n_quantiles), de-normalised."""
         self._validate_trained()
-        assert self._net is not None
+        if self._net is None:
 
+            raise RuntimeError("_net is not None not initialized; call the appropriate setup method first.")
         raw = np.asarray(X, dtype=np.float32)
         if raw.ndim == 1:
             raw = raw.reshape(-1, 1)
@@ -369,7 +373,9 @@ class TemporalFusionTransformer(TradingModel):
 
     def save(self, path: Path) -> Path:
         self._validate_trained()
-        assert self._net is not None
+        if self._net is None:
+
+            raise RuntimeError("_net is not None not initialized; call the appropriate setup method first.")
         path = Path(path)
         path.mkdir(parents=True, exist_ok=True)
 
@@ -412,7 +418,9 @@ class TemporalFusionTransformer(TradingModel):
         return DataLoader(ds, batch_size=self.config.batch_size, shuffle=shuffle)
 
     def _run_epoch(self, loader: DataLoader, optimiser: torch.optim.Optimizer) -> float:
-        assert self._net is not None
+        if self._net is None:
+
+            raise RuntimeError("_net is not None not initialized; call the appropriate setup method first.")
         self._net.train()
         total = 0.0
         n = 0
@@ -431,7 +439,9 @@ class TemporalFusionTransformer(TradingModel):
 
     @torch.no_grad()
     def _evaluate(self, loader: DataLoader) -> float:
-        assert self._net is not None
+        if self._net is None:
+
+            raise RuntimeError("_net is not None not initialized; call the appropriate setup method first.")
         self._net.eval()
         total = 0.0
         n = 0

@@ -9,27 +9,24 @@ for stop-loss and take-profit exits.
 from __future__ import annotations
 
 import asyncio
-import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timezone
+from typing import Any, Dict, Optional
 
 import structlog
 
 from hedgefund.engine.decision_engine import TradeAction, TradeDecision
 from hedgefund.execution.broker_manager import BrokerManager
-from hedgefund.risk.base import RiskManager, RiskVerdict
+from hedgefund.risk.base import RiskManager
 from hedgefund.risk.position_sizer import PositionSizer
 from hedgefund.streaming.event_bus import Event, EventBus, EventType
 from hedgefund.types import (
-    Greeks,
     OptionContract,
     OptionType,
     Order,
     OrderStatus,
     OrderType,
-    PortfolioSnapshot,
     Side,
 )
 
@@ -255,7 +252,7 @@ class TradeExecutor:
             underlying=decision.symbol,
             option_type=option_type,
             strike=round(decision.entry_price, 2),
-            expiration=datetime.utcnow().date(),
+            expiration=datetime.now(timezone.utc).date(),
         )
 
         order = Order(
@@ -309,7 +306,7 @@ class TradeExecutor:
             target_price=decision.target_price,
             trailing_stop=decision.stop_loss,
             quantity=filled_order.filled_quantity or quantity,
-            opened_at=datetime.utcnow(),
+            opened_at=datetime.now(timezone.utc),
             highest_price=fill_price,
             lowest_price=fill_price,
             atr=atr,
@@ -321,7 +318,7 @@ class TradeExecutor:
         # 6. Publish fill event
         await self._bus.publish(Event(
             event_type=EventType.FILL,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             symbol=decision.symbol,
             data={
                 "trade_id": trade.trade_id,
@@ -467,7 +464,7 @@ class TradeExecutor:
             pnl = (trade.entry_price - exit_price) * trade.quantity * multiplier
         pnl_pct = (exit_price - trade.entry_price) / trade.entry_price if trade.entry_price > 0 else 0.0
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         completed = CompletedTrade(
             trade_id=trade.trade_id,
             decision_id=trade.decision_id,

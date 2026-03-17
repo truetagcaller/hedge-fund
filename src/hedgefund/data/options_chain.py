@@ -8,10 +8,9 @@ from __future__ import annotations
 
 import asyncio
 import math
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import List, Optional
 
-import numpy as np
 import yfinance as yf
 from scipy.stats import norm
 
@@ -193,8 +192,8 @@ class OptionsChainFetcher(OptionsChainProvider):
             ) from exc
 
         exp_date = date.fromisoformat(expiration)
-        T = max((exp_date - date.today()).days / 365.0, 1e-6)
-        now = datetime.utcnow()
+        T = max((exp_date - datetime.now(timezone.utc).date()).days / 365.0, 1e-6)
+        now = datetime.now(timezone.utc)
 
         quotes: List[OptionQuote] = []
 

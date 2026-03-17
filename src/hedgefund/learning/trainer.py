@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -137,7 +137,7 @@ class ModelTrainer:
         run = TrainingRun(
             model_name=model.metadata.model_name,
             version=model.metadata.version,
-            started_at=datetime.utcnow(),
+            started_at=datetime.now(timezone.utc),
             fold=fold,
             hyperparameters=model.metadata.hyperparameters,
         )
@@ -172,7 +172,7 @@ class ModelTrainer:
         finally:
             elapsed = time.monotonic() - t0
             run.duration_seconds = elapsed
-            run.finished_at = datetime.utcnow()
+            run.finished_at = datetime.now(timezone.utc)
             self._runs.append(run)
             self._log.info(
                 "training_run_end",

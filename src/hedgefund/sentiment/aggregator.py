@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
-from typing import Any
+from datetime import datetime, timezone
 
 import structlog
 
@@ -114,7 +113,7 @@ class SentimentAggregator(SentimentScorer):
                 magnitude=0.0,
                 source="aggregator",
                 headline=f"Insufficient sources ({active_sources}/{self._min_sources})",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         final_score = weighted_score / effective_weight
@@ -126,5 +125,5 @@ class SentimentAggregator(SentimentScorer):
             magnitude=max(0.0, min(1.0, final_mag)),
             source="aggregator",
             headline=" | ".join(details),
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
         )

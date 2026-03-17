@@ -11,9 +11,8 @@ import base64
 import hashlib
 import json
 import os
-import re
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 import bcrypt
 

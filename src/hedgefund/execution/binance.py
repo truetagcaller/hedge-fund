@@ -19,8 +19,8 @@ import hmac
 import json
 import time
 from collections.abc import AsyncIterator
-from dataclasses import dataclass, field
-from datetime import date, datetime
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Optional
 from urllib.parse import urlencode
 
@@ -269,8 +269,8 @@ class BinanceBroker(Broker):
                 await self._request(
                     "DELETE", url, params={"listenKey": self._listen_key}, signed=False
                 )
-            except Exception:
-                pass
+            except Exception:  # noqa: S110
+                    logger.debug("unexpected_error", exc_info=True)
             self._listen_key = None
 
         if self._client:
@@ -283,7 +283,7 @@ class BinanceBroker(Broker):
 
     async def submit_order(self, order: Order) -> Order:
         """Place an order on Binance Spot, Futures, or Options."""
-        is_option = order.contract.expiration != date.today() or order.contract.strike > 0
+        is_option = order.contract.expiration != datetime.now(timezone.utc).date() or order.contract.strike > 0
         is_futures = self._config.futures_enabled and not is_option
 
         side_str = "BUY" if order.side == Side.BUY else "SELL"
@@ -409,7 +409,7 @@ class BinanceBroker(Broker):
                 underlying="UNKNOWN",
                 option_type=OptionType.CALL,
                 strike=0,
-                expiration=date.today(),
+                expiration=datetime.now(timezone.utc).date(),
             ),
             side=Side.BUY,
             order_type=OrderType.MARKET,
@@ -440,7 +440,7 @@ class BinanceBroker(Broker):
                             underlying=symbol,
                             option_type=OptionType.CALL,
                             strike=0,
-                            expiration=date.today(),
+                            expiration=datetime.now(timezone.utc).date(),
                             multiplier=1,
                         ),
                         quantity=int(abs(amt)),
@@ -466,7 +466,7 @@ class BinanceBroker(Broker):
                             underlying=f"{asset}USDT",
                             option_type=OptionType.CALL,
                             strike=0,
-                            expiration=date.today(),
+                            expiration=datetime.now(timezone.utc).date(),
                             multiplier=1,
                         ),
                         quantity=int(total) if total >= 1 else 1,
@@ -498,7 +498,7 @@ class BinanceBroker(Broker):
             net_liq = cash  # Simplified; a full implementation would price each asset.
 
         return PortfolioSnapshot(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             cash=cash,
             net_liquidation=net_liq,
             positions=positions,
@@ -624,7 +624,7 @@ class BinanceBroker(Broker):
             cum_quote = float(result.get("cummulativeQuoteQty", 0))
             order.filled_price = cum_quote / filled_qty if filled_qty else None
         if status == OrderStatus.FILLED:
-            order.filled_at = datetime.utcnow()
+            order.filled_at = datetime.now(timezone.utc)
 
         logger.info(
             "binance_order_submitted",
@@ -661,7 +661,7 @@ class BinanceBroker(Broker):
                 underlying=symbol,
                 option_type=OptionType.CALL,
                 strike=0,
-                expiration=date.today(),
+                expiration=datetime.now(timezone.utc).date(),
                 multiplier=1,
             ),
             side=side,
@@ -672,7 +672,7 @@ class BinanceBroker(Broker):
             status=status,
             filled_price=filled_price,
             filled_quantity=filled_qty,
-            filled_at=datetime.utcfromtimestamp(o["updateTime"] / 1000) if o.get("updateTime") else None,
+            filled_at=datetime.fromtimestamp(o["updateTime"] / 1000, tz=timezone.utc) if o.get("updateTime") else None,
         )
 
     def _map_ws_execution_report(self, msg: dict[str, Any]) -> Order:
@@ -692,7 +692,7 @@ class BinanceBroker(Broker):
                 underlying=msg.get("s", "UNKNOWN"),
                 option_type=OptionType.CALL,
                 strike=0,
-                expiration=date.today(),
+                expiration=datetime.now(timezone.utc).date(),
                 multiplier=1,
             ),
             side=side,
@@ -701,7 +701,7 @@ class BinanceBroker(Broker):
             status=status,
             filled_price=filled_price,
             filled_quantity=filled_qty,
-            filled_at=datetime.utcfromtimestamp(msg["T"] / 1000) if msg.get("T") else None,
+            filled_at=datetime.fromtimestamp(msg["T"] / 1000, tz=timezone.utc) if msg.get("T") else None,
         )
 
     def _map_ws_futures_order(self, o: dict[str, Any]) -> Order:
@@ -720,7 +720,7 @@ class BinanceBroker(Broker):
                 underlying=o.get("s", "UNKNOWN"),
                 option_type=OptionType.CALL,
                 strike=0,
-                expiration=date.today(),
+                expiration=datetime.now(timezone.utc).date(),
                 multiplier=1,
             ),
             side=side,
@@ -729,5 +729,5 @@ class BinanceBroker(Broker):
             status=status,
             filled_price=avg_price if avg_price > 0 else None,
             filled_quantity=filled_qty,
-            filled_at=datetime.utcnow(),
+            filled_at=datetime.now(timezone.utc),
         )

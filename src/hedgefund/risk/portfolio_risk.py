@@ -7,13 +7,13 @@ stress testing, and correlation-adjusted risk measurement.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Sequence
 
 import numpy as np
 import structlog
 
-from hedgefund.types import Greeks, Position, PortfolioSnapshot
+from hedgefund.types import Position
 
 logger = structlog.get_logger(__name__)
 

@@ -16,12 +16,11 @@ from __future__ import annotations
 import hashlib
 import hmac
 import base64
-import json
 from datetime import datetime, timezone
 from typing import Any, Dict
 
 import structlog
-from fastapi import APIRouter, Query, Request, Response, status
+from fastapi import APIRouter, Query, Request, status
 
 log = structlog.get_logger(__name__)
 
@@ -119,8 +118,8 @@ def _get_consumer_secret(request: Request) -> str:
         secret = store.retrieve("twitter", "consumer_secret")
         if secret:
             return secret
-    except Exception:
-        pass
+    except Exception:  # noqa: S110
+            log.debug("unexpected_error", exc_info=True)
 
     # Fall back to environment variable
     import os

@@ -140,8 +140,6 @@ class RegimeDetector:
         """
         means = model.means_  # (n_states, n_features)
         mapping: dict[int, MarketRegime] = {}
-        regime_list = list(MarketRegime)
-
         for state_idx in range(means.shape[0]):
             ret_mean = means[state_idx, 0]   # log return
             vol_mean = means[state_idx, 1]   # volatility

@@ -14,7 +14,7 @@ risk-reward ratio.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import pandas as pd
@@ -190,7 +190,7 @@ class RuleBasedSignalGenerator(SignalGenerator):
 
         return TradeSignal(
             signal_id=TradeSignal.generate_id(),
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             underlying="",  # caller should fill from features
             action=action,
             direction=direction,

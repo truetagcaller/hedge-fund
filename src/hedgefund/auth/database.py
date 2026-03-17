@@ -61,7 +61,9 @@ class MongoDB:
 
     async def create_indexes(self) -> None:
         """Create all required indexes for every collection."""
-        assert self._db is not None, "Call connect() first"
+        if self._db is None:
+
+            raise RuntimeError("Call connect() first")
 
         # users
         await self._db.users.create_indexes([
@@ -168,79 +170,109 @@ class MongoDB:
 
     @property
     def users(self) -> motor.motor_asyncio.AsyncIOMotorCollection:
-        assert self._db is not None, "Call connect() first"
+        if self._db is None:
+
+            raise RuntimeError("Call connect() first")
         return self._db.users
 
     @property
     def broker_accounts(self) -> motor.motor_asyncio.AsyncIOMotorCollection:
-        assert self._db is not None, "Call connect() first"
+        if self._db is None:
+
+            raise RuntimeError("Call connect() first")
         return self._db.broker_accounts
 
     @property
     def trades(self) -> motor.motor_asyncio.AsyncIOMotorCollection:
-        assert self._db is not None, "Call connect() first"
+        if self._db is None:
+
+            raise RuntimeError("Call connect() first")
         return self._db.trades
 
     @property
     def signals(self) -> motor.motor_asyncio.AsyncIOMotorCollection:
-        assert self._db is not None, "Call connect() first"
+        if self._db is None:
+
+            raise RuntimeError("Call connect() first")
         return self._db.signals
 
     @property
     def positions(self) -> motor.motor_asyncio.AsyncIOMotorCollection:
-        assert self._db is not None, "Call connect() first"
+        if self._db is None:
+
+            raise RuntimeError("Call connect() first")
         return self._db.positions
 
     @property
     def x_accounts(self) -> motor.motor_asyncio.AsyncIOMotorCollection:
-        assert self._db is not None, "Call connect() first"
+        if self._db is None:
+
+            raise RuntimeError("Call connect() first")
         return self._db.x_accounts
 
     @property
     def x_posts(self) -> motor.motor_asyncio.AsyncIOMotorCollection:
-        assert self._db is not None, "Call connect() first"
+        if self._db is None:
+
+            raise RuntimeError("Call connect() first")
         return self._db.x_posts
 
     @property
     def sentiment_data(self) -> motor.motor_asyncio.AsyncIOMotorCollection:
-        assert self._db is not None, "Call connect() first"
+        if self._db is None:
+
+            raise RuntimeError("Call connect() first")
         return self._db.sentiment_data
 
     @property
     def backtests(self) -> motor.motor_asyncio.AsyncIOMotorCollection:
-        assert self._db is not None, "Call connect() first"
+        if self._db is None:
+
+            raise RuntimeError("Call connect() first")
         return self._db.backtests
 
     @property
     def training_data(self) -> motor.motor_asyncio.AsyncIOMotorCollection:
-        assert self._db is not None, "Call connect() first"
+        if self._db is None:
+
+            raise RuntimeError("Call connect() first")
         return self._db.training_data
 
     @property
     def data_sources(self) -> motor.motor_asyncio.AsyncIOMotorCollection:
-        assert self._db is not None, "Call connect() first"
+        if self._db is None:
+
+            raise RuntimeError("Call connect() first")
         return self._db.data_sources
 
     # -- Level-4 collections ---------------------------------------------------
 
     @property
     def strategy_trades(self) -> motor.motor_asyncio.AsyncIOMotorCollection:
-        assert self._db is not None, "Call connect() first"
+        if self._db is None:
+
+            raise RuntimeError("Call connect() first")
         return self._db.strategy_trades
 
     @property
     def strategy_performance(self) -> motor.motor_asyncio.AsyncIOMotorCollection:
-        assert self._db is not None, "Call connect() first"
+        if self._db is None:
+
+            raise RuntimeError("Call connect() first")
         return self._db.strategy_performance
 
     @property
     def strategy_allocations(self) -> motor.motor_asyncio.AsyncIOMotorCollection:
-        assert self._db is not None, "Call connect() first"
+        if self._db is None:
+
+            raise RuntimeError("Call connect() first")
         return self._db.strategy_allocations
 
     @property
     def strategy_evolution_log(self) -> motor.motor_asyncio.AsyncIOMotorCollection:
-        assert self._db is not None, "Call connect() first"
+        if self._db is None:
+
+            raise RuntimeError("Call connect() first")
         return self._db.strategy_evolution_log
 
 

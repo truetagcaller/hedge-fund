@@ -3,7 +3,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 
 from hedgefund.types import (
     OptionContract,
@@ -83,7 +83,7 @@ def sample_option_quote(sample_option_contract, sample_greeks) -> OptionQuote:
         volume=1500,
         open_interest=25000,
         greeks=sample_greeks,
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(timezone.utc),
     )
 
 
@@ -91,7 +91,7 @@ def sample_option_quote(sample_option_contract, sample_greeks) -> OptionQuote:
 def sample_trade_signal(sample_option_contract) -> TradeSignal:
     return TradeSignal(
         signal_id=TradeSignal.generate_id(),
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(timezone.utc),
         underlying="SPY",
         action=SignalAction.BUY_CALL,
         direction=SignalDirection.LONG,
@@ -109,7 +109,7 @@ def sample_trade_signal(sample_option_contract) -> TradeSignal:
 @pytest.fixture
 def sample_portfolio() -> PortfolioSnapshot:
     return PortfolioSnapshot(
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(timezone.utc),
         cash=9_500_000.0,
         net_liquidation=10_000_000.0,
         positions=[],
@@ -148,7 +148,7 @@ def portfolio_with_positions(sample_option_contract, sample_greeks) -> Portfolio
         ),
     ]
     return PortfolioSnapshot(
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(timezone.utc),
         cash=9_000_000.0,
         net_liquidation=9_505_000.0,
         positions=positions,

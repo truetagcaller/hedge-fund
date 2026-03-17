@@ -11,10 +11,9 @@ from __future__ import annotations
 import asyncio
 import math
 import random
-import uuid
-from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, Optional
 
 import structlog
 
@@ -247,14 +246,14 @@ class PaperTradingSimulator:
     async def submit_order(self, order: Order) -> Order:
         """Submit an order with simulated latency, slippage, and market impact."""
         # Simulate fill latency
-        latency_ms = random.uniform(
+        latency_ms = random.uniform(  # noqa: S311
             self._config.min_latency_ms,
             self._config.max_latency_ms,
         )
         await asyncio.sleep(latency_ms / 1000.0)
 
         # Apply slippage
-        slippage_bps = random.gauss(
+        slippage_bps = random.gauss(  # noqa: S311
             self._config.slippage_mean_bps,
             self._config.slippage_std_bps,
         )
@@ -282,9 +281,9 @@ class PaperTradingSimulator:
         original_qty = order.quantity
         if (
             self._config.partial_fill_probability > 0
-            and random.random() < self._config.partial_fill_probability
+            and random.random() < self._config.partial_fill_probability  # noqa: S311
         ):
-            fill_pct = random.uniform(self._config.partial_fill_min_pct, 1.0)
+            fill_pct = random.uniform(self._config.partial_fill_min_pct, 1.0)  # noqa: S311
             order.quantity = max(1, int(order.quantity * fill_pct))
             log.debug(
                 "paper_simulator.partial_fill",
@@ -330,7 +329,7 @@ class PaperTradingSimulator:
         drift = cfg.gbm_drift
         vol = cfg.gbm_volatility
 
-        z = random.gauss(0, 1)
+        z = random.gauss(0, 1)  # noqa: S311
         new_price = price * math.exp((drift - 0.5 * vol ** 2) * dt + vol * math.sqrt(dt) * z)
         new_price = max(0.01, new_price)
         self._prices[symbol] = new_price
@@ -341,7 +340,7 @@ class PaperTradingSimulator:
         ask = new_price + spread / 2.0
 
         # Simulate volume
-        volume = max(1, int(random.gauss(cfg.base_volume_per_tick, cfg.base_volume_per_tick * 0.3)))
+        volume = max(1, int(random.gauss(cfg.base_volume_per_tick, cfg.base_volume_per_tick * 0.3)))  # noqa: S311
 
         # Synthetic ATR (roughly vol * price * sqrt(dt_daily))
         atr = new_price * vol * math.sqrt(1.0 / 252.0)
@@ -349,7 +348,7 @@ class PaperTradingSimulator:
         # Publish tick event
         await self._bus.publish(Event(
             event_type=EventType.TICK,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             symbol=symbol,
             data={
                 "price": round(new_price, 4),
@@ -357,8 +356,8 @@ class PaperTradingSimulator:
                 "ask": round(ask, 4),
                 "close": round(new_price, 4),
                 "open": round(price, 4),
-                "high": round(max(price, new_price) * (1 + random.uniform(0, 0.001)), 4),
-                "low": round(min(price, new_price) * (1 - random.uniform(0, 0.001)), 4),
+                "high": round(max(price, new_price) * (1 + random.uniform(0, 0.001)), 4),  # noqa: S311
+                "low": round(min(price, new_price) * (1 - random.uniform(0, 0.001)), 4),  # noqa: S311
                 "volume": volume,
                 "atr": round(atr, 4),
             },
@@ -366,10 +365,8 @@ class PaperTradingSimulator:
         ))
 
         # Update positions in broker with new price
-        contract_key_prefix = f"{symbol}"
         for pos_key, pos in list(self._broker._positions.items()):
             if pos.contract.underlying == symbol:
-                mid = (bid + ask) / 2.0
                 await self._broker.process_tick(
                     pos.contract, bid=bid, ask=ask
                 )
@@ -410,7 +407,7 @@ class PaperTradingSimulator:
 
         for dte in expirations:
             T = dte / 365.0
-            exp_date = (datetime.utcnow() + timedelta(days=dte)).date()
+            exp_date = (datetime.now(timezone.utc) + timedelta(days=dte)).date()
 
             for i in range(-half, half + 1):
                 strike = center_strike + i * strike_step
@@ -419,7 +416,7 @@ class PaperTradingSimulator:
 
                 for is_call in (True, False):
                     opt_type = OptionType.CALL if is_call else OptionType.PUT
-                    sigma = cfg.gbm_volatility * random.uniform(0.8, 1.2)  # skew
+                    sigma = cfg.gbm_volatility * random.uniform(0.8, 1.2)  # skew  # noqa: S311
 
                     theo_price = _bsm_price(price, strike, T, cfg.risk_free_rate, sigma, is_call)
                     greeks = _bsm_greeks(price, strike, T, cfg.risk_free_rate, sigma, is_call)
@@ -428,8 +425,8 @@ class PaperTradingSimulator:
                     bid = max(0.01, theo_price - spread / 2.0)
                     ask = theo_price + spread / 2.0
 
-                    oi = max(0, int(random.gauss(5000, 2000)))
-                    vol = max(0, int(random.gauss(500, 200)))
+                    oi = max(0, int(random.gauss(5000, 2000)))  # noqa: S311
+                    vol = max(0, int(random.gauss(500, 200)))  # noqa: S311
 
                     contract = OptionContract(
                         symbol=f"{symbol}{exp_date.strftime('%y%m%d')}{'C' if is_call else 'P'}{int(strike * 100):08d}",
@@ -447,7 +444,7 @@ class PaperTradingSimulator:
                         volume=vol,
                         open_interest=oi,
                         greeks=greeks,
-                        timestamp=datetime.utcnow(),
+                        timestamp=datetime.now(timezone.utc),
                     ))
 
         return quotes
@@ -480,13 +477,13 @@ class PaperTradingSimulator:
 
         await self._bus.publish(Event(
             event_type=EventType.OPTIONS_CHAIN,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             symbol=symbol,
             data={
                 "pcr": round(pcr, 4),
                 "max_pain": round(max_pain_strike, 2),
                 "iv": round(avg_iv, 4),
-                "gex": round(random.gauss(0, 1e9), 2),
+                "gex": round(random.gauss(0, 1e9), 2),  # noqa: S311
                 "total_call_oi": total_call_oi,
                 "total_put_oi": total_put_oi,
                 "chain_length": len(chain),

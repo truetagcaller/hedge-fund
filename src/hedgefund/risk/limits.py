@@ -7,11 +7,10 @@ collect all violations before deciding how to proceed.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Sequence
 
 import structlog
 
-from hedgefund.types import Order, Position, PortfolioSnapshot
+from hedgefund.types import PortfolioSnapshot
 
 logger = structlog.get_logger(__name__)
 

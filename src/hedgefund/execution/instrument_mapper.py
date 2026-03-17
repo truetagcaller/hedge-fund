@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from hedgefund.exceptions import InstrumentMappingError
@@ -246,7 +246,7 @@ class InstrumentMapper:
     @staticmethod
     def _next_weekly_expiry() -> date:
         """Return the next Thursday (weekly expiry for Indian markets)."""
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         days_ahead = (3 - today.weekday()) % 7  # Thursday = 3
         if days_ahead == 0:
             days_ahead = 7
@@ -255,7 +255,7 @@ class InstrumentMapper:
     @staticmethod
     def _next_monthly_expiry() -> date:
         """Return the last Thursday of the current month."""
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         # Find last day of current month
         if today.month == 12:
             next_month = date(today.year + 1, 1, 1)

@@ -224,8 +224,8 @@ class ConnectionManager:
         try:
             if ws.client_state == WebSocketState.CONNECTED:
                 await ws.close()
-        except Exception:
-            pass
+        except Exception:  # noqa: S110
+                log.debug("unexpected_error", exc_info=True)
 
 
 async def websocket_endpoint(websocket: WebSocket) -> None:

@@ -92,12 +92,16 @@ class _SequencePreprocessor:
         self._stds[self._stds < 1e-8] = 1.0
 
     def transform(self, data: np.ndarray) -> np.ndarray:
-        assert self._means is not None, "Call fit() before transform()."
+        if self._means is None:
+
+            raise RuntimeError("Call fit() before transform().")
         return (data - self._means) / self._stds
 
     def inverse_transform(self, data: np.ndarray, col_idx: int = 0) -> np.ndarray:
         """Undo normalisation for a single output column."""
-        assert self._means is not None
+        if self._means is None:
+
+            raise RuntimeError("_means is not None not initialized; call the appropriate setup method first.")
         return data * self._stds[col_idx] + self._means[col_idx]
 
     def create_sequences(
@@ -248,7 +252,9 @@ class LSTMPricePredictor(TradingModel):
     def predict(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
         """Point predictions (de-normalised)."""
         self._validate_trained()
-        assert self._net is not None
+        if self._net is None:
+
+            raise RuntimeError("_net is not None not initialized; call the appropriate setup method first.")
         preds_normed = self._forward_pass(X)
         return self._preprocessor.inverse_transform(preds_normed)
 
@@ -261,8 +267,9 @@ class LSTMPricePredictor(TradingModel):
         to approximate the predictive distribution.
         """
         self._validate_trained()
-        assert self._net is not None
+        if self._net is None:
 
+            raise RuntimeError("_net is not None not initialized; call the appropriate setup method first.")
         raw = np.asarray(X, dtype=np.float32)
         if raw.ndim == 1:
             raw = raw.reshape(-1, 1)
@@ -292,7 +299,9 @@ class LSTMPricePredictor(TradingModel):
 
     def save(self, path: Path) -> Path:
         self._validate_trained()
-        assert self._net is not None
+        if self._net is None:
+
+            raise RuntimeError("_net is not None not initialized; call the appropriate setup method first.")
         path = Path(path)
         path.mkdir(parents=True, exist_ok=True)
 
@@ -345,7 +354,9 @@ class LSTMPricePredictor(TradingModel):
         criterion: nn.Module,
         optimiser: torch.optim.Optimizer,
     ) -> float:
-        assert self._net is not None
+        if self._net is None:
+
+            raise RuntimeError("_net is not None not initialized; call the appropriate setup method first.")
         self._net.train()
         total_loss = 0.0
         n_batches = 0
@@ -364,7 +375,9 @@ class LSTMPricePredictor(TradingModel):
 
     @torch.no_grad()
     def _evaluate(self, loader: DataLoader, criterion: nn.Module) -> float:
-        assert self._net is not None
+        if self._net is None:
+
+            raise RuntimeError("_net is not None not initialized; call the appropriate setup method first.")
         self._net.eval()
         total_loss = 0.0
         n_batches = 0
@@ -378,7 +391,9 @@ class LSTMPricePredictor(TradingModel):
 
     def _forward_pass(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
         """Normalise, sequence, and run a single forward pass."""
-        assert self._net is not None
+        if self._net is None:
+
+            raise RuntimeError("_net is not None not initialized; call the appropriate setup method first.")
         raw = np.asarray(X, dtype=np.float32)
         if raw.ndim == 1:
             raw = raw.reshape(-1, 1)

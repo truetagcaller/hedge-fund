@@ -7,8 +7,6 @@ swapped for any social-data vendor that returns JSON.
 
 from __future__ import annotations
 
-import asyncio
-from collections.abc import AsyncIterator
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 

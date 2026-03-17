@@ -6,7 +6,7 @@ trades to follow smart money positioning.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import structlog
@@ -134,7 +134,7 @@ class SmartMoneyFlowAgent(TradingAgent):
 
         return AgentSignal(
             agent_name=self._name,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             symbol=symbol,
             action=action,
             direction=direction,

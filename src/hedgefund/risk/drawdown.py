@@ -9,8 +9,8 @@ detection with reduced position sizing.
 from __future__ import annotations
 
 import enum
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import structlog
@@ -76,7 +76,7 @@ class DrawdownMonitor:
         self._equity_history: list[tuple[datetime, float]] = []
 
         if initial_equity > 0:
-            self._equity_history.append((datetime.utcnow(), initial_equity))
+            self._equity_history.append((datetime.now(timezone.utc), initial_equity))
 
     # ── Properties ────────────────────────────────────────────────────────
 
@@ -121,7 +121,7 @@ class DrawdownMonitor:
         -------
         DrawdownSnapshot with the current drawdown state.
         """
-        ts = timestamp or datetime.utcnow()
+        ts = timestamp or datetime.now(timezone.utc)
         self._equity_history.append((ts, equity))
 
         # Update high-water mark
@@ -169,7 +169,7 @@ class DrawdownMonitor:
         self._state = TradingState.ACTIVE
         self._halted_at = None
         self._equity_history.clear()
-        self._equity_history.append((datetime.utcnow(), new_equity))
+        self._equity_history.append((datetime.now(timezone.utc), new_equity))
         logger.info("drawdown_monitor.reset", equity=new_equity)
 
     def get_equity_curve(self) -> list[tuple[datetime, float]]:

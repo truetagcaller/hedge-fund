@@ -6,9 +6,9 @@ import asyncio
 import math
 import statistics
 from collections import deque
-from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, Protocol
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import Protocol
 
 import structlog
 
@@ -153,7 +153,7 @@ class SocialSentimentScorer(SentimentScorer):
             magnitude=raw_mag,
             source="social",
             headline=f"Aggregated {len(posts)} posts (spike={spike_detected})",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
         )
 
     async def score_batch(self, symbols: list[str]) -> list[SentimentResult]:
@@ -178,5 +178,5 @@ class SocialSentimentScorer(SentimentScorer):
             magnitude=0.0,
             source="social",
             headline="",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
         )

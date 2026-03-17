@@ -9,9 +9,8 @@ from __future__ import annotations
 
 import asyncio
 import re
-import time
 from collections import OrderedDict
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import structlog
@@ -202,7 +201,7 @@ class NewsSentimentScorer(SentimentScorer):
                 magnitude=0.0,
                 source=f"news:{self._model_name}",
                 headline="",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         scores = await self._score_many(headlines)
@@ -215,7 +214,7 @@ class NewsSentimentScorer(SentimentScorer):
             magnitude=max(0.0, min(1.0, avg_mag)),
             source=f"news:{self._model_name}",
             headline=headlines[0],
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
         )
 
     async def score_batch(self, symbols: list[str]) -> list[SentimentResult]:

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import pickle
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -282,7 +282,7 @@ class MLSignalGenerator(SignalGenerator):
 
         return TradeSignal(
             signal_id=TradeSignal.generate_id(),
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             underlying="",
             action=action,
             direction=direction,
