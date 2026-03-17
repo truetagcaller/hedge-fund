@@ -6,7 +6,7 @@ orders being filled rapidly, signalling institutional activity.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import structlog
@@ -143,7 +143,7 @@ class LiquiditySweepAgent(TradingAgent):
 
         return AgentSignal(
             agent_name=self._name,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             symbol=symbol,
             action=action,
             direction=direction,

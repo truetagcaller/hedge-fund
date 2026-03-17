@@ -9,7 +9,7 @@ from __future__ import annotations
 import enum
 import uuid
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Any, Optional
 
 
@@ -206,7 +206,7 @@ class Order:
     filled_quantity: int = 0
     filled_at: Optional[datetime] = None
     commission: float = 0.0
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     @staticmethod
     def generate_id() -> str:
@@ -224,7 +224,7 @@ class Position:
     greeks: Greeks
     unrealized_pnl: float
     realized_pnl: float = 0.0
-    opened_at: datetime = field(default_factory=datetime.utcnow)
+    opened_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     @property
     def market_value(self) -> float:
@@ -268,7 +268,7 @@ class SentimentResult:
     magnitude: float  # 0.0 to 1.0 (strength/confidence)
     source: str
     headline: str = ""
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # ── Backtest Results ───────────────────────────────────────────────────────────
@@ -376,7 +376,7 @@ class StrategyAllocation:
     allocation_pct: float  # 0.0 to 1.0
     allocated_capital: float
     method: str  # "equal", "manual", "performance", "mvo", "kelly"
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def to_dict(self) -> dict[str, Any]:
         ua = self.updated_at
@@ -406,7 +406,7 @@ class StrategyMetrics:
     avg_rr: float = 0.0
     total_pnl: float = 0.0
     avg_hold_minutes: float = 0.0
-    computed_at: datetime = field(default_factory=datetime.utcnow)
+    computed_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def to_dict(self) -> dict[str, Any]:
         return {

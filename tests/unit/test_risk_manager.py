@@ -1,20 +1,12 @@
 """Tests for risk management system."""
 
-import pytest
 from datetime import datetime, timezone
 
 from hedgefund.risk.position_sizer import PositionSizer
 from hedgefund.risk.drawdown import DrawdownMonitor
 from hedgefund.risk.limits import RiskLimits
 from hedgefund.types import (
-    TradeSignal,
-    SignalAction,
-    SignalDirection,
     PortfolioSnapshot,
-    Position,
-    OptionContract,
-    OptionType,
-    Greeks,
 )
 
 

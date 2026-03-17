@@ -8,16 +8,15 @@ run before any order reaches the broker.
 from __future__ import annotations
 
 import asyncio
-import math
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from typing import Optional, Sequence
+from dataclasses import dataclass
+from datetime import timedelta
+from typing import Sequence
 
 import structlog
 
-from hedgefund.types import Order, OrderStatus, OrderType, Side, TradeSignal, PortfolioSnapshot
+from hedgefund.types import Order, OrderStatus, TradeSignal, PortfolioSnapshot
 from hedgefund.execution.base import Broker
-from hedgefund.risk.validators import PreTradeValidator, ValidationResult
+from hedgefund.risk.validators import PreTradeValidator
 
 logger = structlog.get_logger(__name__)
 

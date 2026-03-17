@@ -1,10 +1,8 @@
 """Tests for order construction."""
 
-import pytest
 from datetime import date
 
 from hedgefund.types import (
-    OptionContract,
     OptionType,
     Side,
     OrderType,

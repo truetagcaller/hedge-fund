@@ -6,7 +6,7 @@ import abc
 import hashlib
 import json
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -23,7 +23,7 @@ class ModelMetadata:
 
     model_name: str
     version: str
-    training_date: datetime = field(default_factory=datetime.utcnow)
+    training_date: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     training_rows: int = 0
     feature_columns: list[str] = field(default_factory=list)
     hyperparameters: dict[str, Any] = field(default_factory=dict)

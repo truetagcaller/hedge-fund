@@ -8,9 +8,7 @@ Polygon, Benzinga, Alpha Vantage) just need to subclass
 
 from __future__ import annotations
 
-import abc
 from collections.abc import AsyncIterator
-from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Dict, List, Optional
 
 import httpx

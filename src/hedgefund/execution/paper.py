@@ -10,13 +10,9 @@ Provides a full :class:`Broker` implementation with:
 from __future__ import annotations
 
 import asyncio
-import math
-import uuid
-from collections import defaultdict
 from collections.abc import AsyncIterator
-from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Optional
+from dataclasses import dataclass
+from datetime import datetime, timezone
 
 import structlog
 
@@ -115,7 +111,7 @@ class PaperBroker(Broker):
         # Queue limit / stop / stop-limit orders
         self._pending[order.order_id] = _PendingOrder(
             order=order,
-            submitted_at=datetime.utcnow(),
+            submitted_at=datetime.now(timezone.utc),
         )
         logger.info(
             "paper_broker.order_queued",
@@ -152,7 +148,7 @@ class PaperBroker(Broker):
         nlv = self._cash + market_value
 
         return PortfolioSnapshot(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             cash=self._cash,
             net_liquidation=nlv,
             positions=positions,
@@ -190,7 +186,7 @@ class PaperBroker(Broker):
 
         Returns a list of orders that were filled on this tick.
         """
-        ts = timestamp or datetime.utcnow()
+        ts = timestamp or datetime.now(timezone.utc)
         mid = (bid + ask) / 2.0
         filled: list[Order] = []
 
@@ -198,7 +194,6 @@ class PaperBroker(Broker):
         key = contract.osi_symbol
         if key in self._positions:
             pos = self._positions[key]
-            old_price = pos.current_price
             pos.current_price = mid
             pos.unrealized_pnl = (
                 (mid - pos.avg_entry) * pos.quantity * contract.multiplier
@@ -269,7 +264,7 @@ class PaperBroker(Broker):
             fill_price = mid * (1 - self._slippage_pct)
 
         fill_price = max(0.01, fill_price)
-        await self._execute_fill(order, fill_price, datetime.utcnow())
+        await self._execute_fill(order, fill_price, datetime.now(timezone.utc))
         return order
 
     async def _execute_fill(

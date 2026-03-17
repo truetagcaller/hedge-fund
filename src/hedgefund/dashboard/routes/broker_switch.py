@@ -88,8 +88,8 @@ async def get_active_broker(
     if br:
         try:
             active_id = await br.get_active_broker(user_id) or ""
-        except Exception:
-            pass
+        except Exception:  # noqa: S110
+                log.debug("unexpected_error", exc_info=True)
 
     # Fall back to MongoDB preference
     if not active_id and db is not None:
@@ -97,8 +97,8 @@ async def get_active_broker(
             pref = await db.user_preferences.find_one({"user_id": user_id})
             if pref:
                 active_id = pref.get("active_broker", "")
-        except Exception:
-            pass
+        except Exception:  # noqa: S110
+                log.debug("unexpected_error", exc_info=True)
 
     # Fall back to first connected broker
     if not active_id and db is not None:
@@ -108,8 +108,8 @@ async def get_active_broker(
             )
             if doc:
                 active_id = f"{doc.get('broker', '')}_main"
-        except Exception:
-            pass
+        except Exception:  # noqa: S110
+                log.debug("unexpected_error", exc_info=True)
 
     broker_type = _broker_type_from_id(active_id) if active_id else ""
     try:
@@ -237,15 +237,15 @@ async def get_connected_brokers(
     if br:
         try:
             active_id = await br.get_active_broker(user_id) or ""
-        except Exception:
-            pass
+        except Exception:  # noqa: S110
+                log.debug("unexpected_error", exc_info=True)
     if not active_id and db is not None:
         try:
             pref = await db.user_preferences.find_one({"user_id": user_id})
             if pref:
                 active_id = pref.get("active_broker", "")
-        except Exception:
-            pass
+        except Exception:  # noqa: S110
+                log.debug("unexpected_error", exc_info=True)
 
     # Check MongoDB broker_connections
     if db is not None:
@@ -333,8 +333,8 @@ async def get_connected_brokers(
                     "capabilities": _caps_to_dict(caps),
                     "is_active": bid == active_id,
                 })
-    except Exception:
-        pass
+    except Exception:  # noqa: S110
+            log.debug("unexpected_error", exc_info=True)
 
     # Auto-set first broker as active if none selected
     if not active_id and brokers:

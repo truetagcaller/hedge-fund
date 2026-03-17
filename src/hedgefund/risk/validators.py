@@ -8,13 +8,12 @@ is rejected and subsequent checks are skipped.
 from __future__ import annotations
 
 import abc
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional, Sequence
 
 import structlog
 
 from hedgefund.types import (
-    Greeks,
     OptionQuote,
     Order,
     PortfolioSnapshot,

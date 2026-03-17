@@ -12,7 +12,7 @@ import asyncio
 import json
 import struct
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Callable, Coroutine, Dict, List, Optional
 
 from hedgefund.logger import get_logger
@@ -187,7 +187,6 @@ class ZerodhaWebSocketFeed(BaseWebSocketFeed):
         while self._connected and self._ws is not None:
             try:
                 message = await self._ws.recv()
-                recv_time = time.monotonic()
 
                 if isinstance(message, bytes) and len(message) > 2:
                     packets = self._parse_binary(message)
@@ -250,7 +249,7 @@ class ZerodhaWebSocketFeed(BaseWebSocketFeed):
             "instrument_token": token,
             "last_price": last_price,
             "symbol": self.symbol,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
         # Quote mode: OHLC + volume
@@ -415,7 +414,6 @@ class BinanceWebSocketFeed(BaseWebSocketFeed):
         while self._connected and self._ws is not None:
             try:
                 raw = await self._ws.recv()
-                recv_time = time.monotonic()
 
                 msg = json.loads(raw)
                 stream = msg.get("stream", "")
@@ -454,7 +452,7 @@ class BinanceWebSocketFeed(BaseWebSocketFeed):
             "trade_time": data.get("T", 0),
             "buyer_maker": data.get("m", False),
             "trade_id": data.get("t", 0),
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
     def _parse_depth(self, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -472,7 +470,7 @@ class BinanceWebSocketFeed(BaseWebSocketFeed):
             "bids": bids,
             "asks": asks,
             "last_update_id": data.get("u", 0),
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
     def _parse_kline(self, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -488,7 +486,7 @@ class BinanceWebSocketFeed(BaseWebSocketFeed):
             "volume": float(k.get("v", 0)),
             "interval": k.get("i", ""),
             "is_closed": k.get("x", False),
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
     async def _user_data_loop(self) -> None:
@@ -510,12 +508,12 @@ class BinanceWebSocketFeed(BaseWebSocketFeed):
                         "quantity": float(msg.get("q", 0)),
                         "filled_quantity": float(msg.get("z", 0)),
                         "commission": float(msg.get("n", 0)),
-                        "timestamp": datetime.utcnow().isoformat(),
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
                     }
                     await self._event_bus.publish(
                         Event(
                             event_type=EventType.FILL,
-                            timestamp=datetime.utcnow(),
+                            timestamp=datetime.now(timezone.utc),
                             symbol=self.symbol,
                             data=fill_data,
                             source="binance_user_data",
@@ -587,7 +585,7 @@ class GenericWebSocketFeed(BaseWebSocketFeed):
                     data = {
                         "symbol": self.symbol,
                         "last_price": 0.0,
-                        "timestamp": datetime.utcnow().isoformat(),
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
                         "source": "generic_poll",
                     }
 

@@ -16,7 +16,7 @@ from fastapi import HTTPException, Request, status
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response
 
-from hedgefund.auth.jwt_handler import JWTHandler, _resolve_secret
+from hedgefund.auth.jwt_handler import JWTHandler
 from hedgefund.logger import get_logger
 
 log = get_logger(__name__)

@@ -21,7 +21,7 @@ from __future__ import annotations
 import hashlib
 import os
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Dict
 
 import structlog
 from fastapi import APIRouter, HTTPException, Query, Request, status
@@ -50,8 +50,8 @@ def _get_zerodha_config() -> Dict[str, str]:
                 api_key = stored_key
             if stored_secret:
                 api_secret = stored_secret
-        except Exception:
-            pass
+        except Exception:  # noqa: S110
+                log.debug("unexpected_error", exc_info=True)
 
     return {
         "api_key": api_key,

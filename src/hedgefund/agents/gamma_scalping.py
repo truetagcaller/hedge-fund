@@ -7,7 +7,7 @@ predictable price pinning or expansion.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import structlog
@@ -60,8 +60,6 @@ class GammaScalpingAgent(TradingAgent):
         gex = market_data.get("gex", 0.0)
         max_pain = market_data.get("max_pain", 0.0)
         atr = market_data.get("atr", 0.0)
-        iv = market_data.get("iv", 0.0)
-
         if price <= 0:
             return None
         if atr <= 0:
@@ -146,7 +144,7 @@ class GammaScalpingAgent(TradingAgent):
 
         return AgentSignal(
             agent_name=self._name,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             symbol=symbol,
             action=action,
             direction=direction,

@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import asyncio
 import math
-from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, Protocol
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import Protocol
 
 import structlog
 
@@ -198,7 +198,7 @@ class OptionsSentimentScorer(SentimentScorer):
             magnitude=0.0,
             source="options_flow",
             headline="",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
         )
 
     @staticmethod

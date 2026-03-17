@@ -6,7 +6,7 @@ volatility skew to generate options-specific trading signals.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import structlog
@@ -61,7 +61,6 @@ class OptionsVolatilityAgent(TradingAgent):
             return None
 
         # ── IV/HV spread ──────────────────────────────────────────────
-        iv_hv_spread = iv - hv if hv > 0 else 0.0
         iv_hv_ratio = iv / hv if hv > 0 else 1.0
         iv_overpriced = iv_hv_ratio > 1.3
         iv_underpriced = iv_hv_ratio < 0.8
@@ -145,7 +144,7 @@ class OptionsVolatilityAgent(TradingAgent):
 
         return AgentSignal(
             agent_name=self._name,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             symbol=symbol,
             action=action,
             direction=direction,

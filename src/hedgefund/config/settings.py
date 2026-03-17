@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import functools
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings

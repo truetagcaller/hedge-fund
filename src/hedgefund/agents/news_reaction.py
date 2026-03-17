@@ -6,7 +6,7 @@ Strongest in high-volatility regimes where news drives rapid price moves.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import structlog
@@ -131,7 +131,7 @@ class NewsReactionAgent(TradingAgent):
 
         return AgentSignal(
             agent_name=self._name,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             symbol=symbol,
             action=action,
             direction=direction,

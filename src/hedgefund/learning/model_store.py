@@ -6,7 +6,7 @@ import enum
 import json
 import shutil
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -35,7 +35,7 @@ class ModelRecord:
     stage: ModelStage
     artifact_path: str
     metadata: ModelMetadata
-    registered_at: datetime = field(default_factory=datetime.utcnow)
+    registered_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     promoted_at: datetime | None = None
     description: str = ""
 
@@ -197,7 +197,7 @@ class ModelStore:
                     and r.version != version
                 ):
                     r.stage = ModelStage.ARCHIVED
-                    r.promoted_at = datetime.utcnow()
+                    r.promoted_at = datetime.now(timezone.utc)
                     self._log.info(
                         "model_demoted",
                         model=r.model_name,
@@ -215,7 +215,7 @@ class ModelStore:
                     shutil.copy2(item, new_dir / item.name)
 
         record.stage = target_stage
-        record.promoted_at = datetime.utcnow()
+        record.promoted_at = datetime.now(timezone.utc)
         record.artifact_path = str(new_dir)
         self._save_registry()
         self._log.info(

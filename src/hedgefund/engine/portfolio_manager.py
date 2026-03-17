@@ -12,15 +12,15 @@ import asyncio
 import math
 import time
 from collections import deque
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from typing import Any, Dict, Deque, List, Optional
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import Any, Dict, Deque, Optional
 
 import structlog
 
 from hedgefund.execution.broker_manager import BrokerManager
 from hedgefund.streaming.event_bus import Event, EventBus, EventType
-from hedgefund.types import Greeks, PortfolioSnapshot, Position
+from hedgefund.types import PortfolioSnapshot
 
 log = structlog.get_logger(__name__)
 
@@ -184,7 +184,7 @@ class PortfolioManager:
                     return self._snapshot
                 # Return empty snapshot
                 snapshot = PortfolioSnapshot(
-                    timestamp=datetime.utcnow(),
+                    timestamp=datetime.now(timezone.utc),
                     cash=0.0,
                     net_liquidation=0.0,
                     positions=[],
@@ -286,7 +286,7 @@ class PortfolioManager:
     def _sample_equity(self, snapshot: PortfolioSnapshot) -> None:
         """Record a point on the equity curve."""
         point = EquityPoint(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             equity=snapshot.net_liquidation,
             cash=snapshot.cash,
             daily_pnl=snapshot.daily_pnl,
@@ -295,7 +295,7 @@ class PortfolioManager:
 
     def _compute_daily_pnl(self, current_nlv: float) -> float:
         """Compute P&L since start of current trading day."""
-        today = datetime.utcnow().strftime("%Y-%m-%d")
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         if self._current_day != today:
             self._current_day = today
             self._day_start_equity = current_nlv

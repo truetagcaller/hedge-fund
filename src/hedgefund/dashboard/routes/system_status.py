@@ -143,8 +143,8 @@ async def get_data_source_status(request: Request) -> Dict[str, Any]:
             if active:
                 x_sentiment["status"] = "CONNECTED"
                 x_sentiment["source"] = "X (Twitter) Live"
-        except Exception:
-            pass
+        except Exception:  # noqa: S110
+                log.debug("unexpected_error", exc_info=True)
 
     # ── Check DataSourceManager for news sources ──────────────────────
     dsm = getattr(request.app.state, "data_source_manager", None)
@@ -163,8 +163,8 @@ async def get_data_source_status(request: Request) -> Dict[str, Any]:
                 else:
                     news_api["status"] = "CONFIGURED"
                     news_api["source"] = news_found[0].get("name", "News API")
-        except Exception:
-            pass
+        except Exception:  # noqa: S110
+                log.debug("unexpected_error", exc_info=True)
 
     # ── Build warnings ────────────────────────────────────────────────
     if market_feed["status"] != "CONNECTED":
@@ -248,8 +248,8 @@ async def get_credentials_required(request: Request) -> Dict[str, Any]:
         namespaces = store.list_namespaces()
         has_broker = "zerodha" in namespaces or "binance" in namespaces
         has_x = "twitter" in namespaces
-    except Exception:
-        pass
+    except Exception:  # noqa: S110
+            log.debug("unexpected_error", exc_info=True)
 
     # Also check MongoDB
     db = getattr(request.app.state, "db", None)
@@ -258,14 +258,14 @@ async def get_credentials_required(request: Request) -> Dict[str, Any]:
             if not has_broker:
                 broker_doc = await db.broker_connections.find_one({"is_active": True})
                 has_broker = broker_doc is not None
-        except Exception:
-            pass
+        except Exception:  # noqa: S110
+                log.debug("unexpected_error", exc_info=True)
         try:
             if not has_x:
                 x_doc = await db.x_accounts.find_one({"is_active": True})
                 has_x = x_doc is not None
-        except Exception:
-            pass
+        except Exception:  # noqa: S110
+                log.debug("unexpected_error", exc_info=True)
 
     # Check news sources
     dsm = getattr(request.app.state, "data_source_manager", None)
@@ -274,8 +274,8 @@ async def get_credentials_required(request: Request) -> Dict[str, Any]:
             sources = dsm.list_sources()
             news_types = {"rss", "news_api", "economic_calendar", "earnings"}
             has_news = any(s.get("type") in news_types for s in sources)
-        except Exception:
-            pass
+        except Exception:  # noqa: S110
+                log.debug("unexpected_error", exc_info=True)
 
     if not has_broker:
         required.append({

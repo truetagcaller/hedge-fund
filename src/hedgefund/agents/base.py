@@ -9,7 +9,7 @@ from __future__ import annotations
 import abc
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import structlog
@@ -166,7 +166,7 @@ class TradingAgent(abc.ABC):
             )
             return None
 
-        self._last_data_timestamp = datetime.utcnow()
+        self._last_data_timestamp = datetime.now(timezone.utc)
 
         signal = await self.analyze(symbol, market_data)
         if signal is not None:

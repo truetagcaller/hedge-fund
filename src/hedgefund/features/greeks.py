@@ -11,7 +11,6 @@ import math
 from dataclasses import dataclass
 from typing import Optional
 
-import numpy as np
 import pandas as pd
 from scipy import stats
 
@@ -102,7 +101,6 @@ class GreeksCalculator:
         """Return all Greeks for one contract."""
         r, q = self.risk_free_rate, self.dividend_yield
         if T < _MIN_TIME or sigma < _MIN_VOL:
-            intrinsic = max(S - K, 0.0) if option_type == OptionType.CALL else max(K - S, 0.0)
             sign = 1.0 if option_type == OptionType.CALL else -1.0
             itm = (sign * (S - K)) > 0
             return Greeks(

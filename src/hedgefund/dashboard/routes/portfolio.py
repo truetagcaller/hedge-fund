@@ -86,8 +86,8 @@ async def _get_active_broker_type(request: Request, user_id: str) -> str:
                 bt = _type_from_id(bid)
                 if bt:
                     return bt
-        except Exception:
-            pass
+        except Exception:  # noqa: S110
+                log.debug("unexpected_error", exc_info=True)
 
     # 2. Fall back to MongoDB
     db = _get_db(request)
@@ -99,8 +99,8 @@ async def _get_active_broker_type(request: Request, user_id: str) -> str:
                 bt = _type_from_id(broker_id)
                 if bt:
                     return bt
-        except Exception:
-            pass
+        except Exception:  # noqa: S110
+                log.debug("unexpected_error", exc_info=True)
     return ""
 
 
@@ -299,7 +299,6 @@ async def _fetch_zerodha_portfolio() -> Dict[str, Any] | None:
 
             margins = margins_resp.json().get("data", {})
             equity = margins.get("equity", {})
-            commodity = margins.get("commodity", {})
 
             eq_net = equity.get("net", 0)
             eq_cash = equity.get("available", {}).get("cash", 0)
@@ -308,7 +307,6 @@ async def _fetch_zerodha_portfolio() -> Dict[str, Any] | None:
             eq_collateral = equity.get("available", {}).get("collateral", 0)
 
             utilised = equity.get("utilised", {})
-            eq_debits = utilised.get("debits", 0)
 
             # Fetch positions
             pos_resp = await client.get(
@@ -320,7 +318,6 @@ async def _fetch_zerodha_portfolio() -> Dict[str, Any] | None:
             if pos_resp.status_code == 200:
                 pos_data = pos_resp.json().get("data", {})
                 net_positions = pos_data.get("net", [])
-                day_positions = pos_data.get("day", [])
 
             # Fetch holdings
             hold_resp = await client.get(

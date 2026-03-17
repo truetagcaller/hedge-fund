@@ -16,7 +16,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 import httpx
@@ -274,7 +274,7 @@ class GrowwBroker(Broker):
                     underlying="UNKNOWN",
                     option_type=OptionType.CALL,
                     strike=0,
-                    expiration=date.today(),
+                    expiration=datetime.now(timezone.utc).date(),
                     multiplier=1,
                 ),
                 side=Side.BUY,
@@ -321,7 +321,7 @@ class GrowwBroker(Broker):
                             underlying=symbol,
                             option_type=OptionType.CALL,
                             strike=0,
-                            expiration=date.today(),
+                            expiration=datetime.now(timezone.utc).date(),
                             multiplier=1,
                         ),
                         quantity=qty,
@@ -364,7 +364,7 @@ class GrowwBroker(Broker):
                             underlying=symbol,
                             option_type=OptionType.CALL,
                             strike=0,
-                            expiration=date.today(),
+                            expiration=datetime.now(timezone.utc).date(),
                             multiplier=1,
                         ),
                         quantity=abs(qty),
@@ -393,7 +393,7 @@ class GrowwBroker(Broker):
         total_pnl = sum(p.unrealized_pnl for p in positions)
 
         return PortfolioSnapshot(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             cash=0.0,
             net_liquidation=total_value,
             positions=positions,

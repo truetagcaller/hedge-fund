@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import asyncio
 from collections import defaultdict
-from datetime import datetime
-from typing import Any
 
 import pandas as pd
 import structlog
@@ -14,7 +12,6 @@ from hedgefund.signals.base import SignalGenerator
 from hedgefund.types import (
     MarketRegime,
     SentimentResult,
-    SignalAction,
     SignalDirection,
     TradeSignal,
 )

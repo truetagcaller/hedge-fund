@@ -1,6 +1,5 @@
 """Tests for Black-Scholes Greeks calculations."""
 
-import pytest
 import numpy as np
 from hedgefund.features.greeks import GreeksCalculator, bs_price
 from hedgefund.types import OptionType

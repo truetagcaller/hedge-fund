@@ -18,7 +18,6 @@ from typing import Any, Dict
 
 import yaml
 
-from hedgefund.exceptions import ConfigError
 from hedgefund.logger import get_logger
 
 log = get_logger(__name__)
